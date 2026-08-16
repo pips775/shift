@@ -407,40 +407,80 @@ def get_fabbisogno_reparto_df(nome_reparto):
     return st.session_state.fabbisogno_per_reparto[nome_reparto]
 
 # ==========================================
-# 5. STILI CSS CUSTOM
+# 5. STILI CSS CUSTOM PROFESSIONALI
 # ==========================================
 def inject_custom_css():
     st.markdown(
         """
         <style>
+        /* Stili Generali e Tema Dashboard */
+        .stApp {
+            background-color: #0b0f19;
+            color: #f8fafc;
+        }
         .welcome-card {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             border-radius: 16px;
-            padding: 30px;
+            padding: 36px;
             text-align: center;
             color: #ffffff;
-            margin-bottom: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 28px;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.5);
         }
         .welcome-title {
-            font-size: 42px;
+            font-size: 44px;
             font-weight: 800;
-            background: linear-gradient(90deg, #38bdf8, #a855f7);
+            background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
         }
         .wizard-box {
             background: #1e293b;
-            border: 1px solid #38bdf8;
+            border: 1.5px solid #38bdf8;
             border-radius: 16px;
-            padding: 24px;
+            padding: 28px;
             margin-bottom: 24px;
+            box-shadow: 0 10px 25px rgba(56, 189, 248, 0.1);
         }
         .stButton>button {
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: 600;
+            padding: 0.5rem 1rem;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(56, 189, 248, 0.25);
+        }
+        /* Personalizzazione Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 10px;
+            background-color: #111827;
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid #1f2937;
+        }
+        .stTabs [data-baseweb="tab"] {
+            background-color: #1f2937;
+            border-radius: 8px;
+            color: #9ca3af;
+            font-weight: 600;
+            padding: 10px 18px;
+            border: none;
+        }
+        .stTabs [aria-selected="true"] {
+            background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+            color: white !important;
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+        }
+        /* Sidebar Styling */
+        [data-testid="stSidebar"] {
+            background-color: #0f172a;
+            border-right: 1px solid #1e293b;
         }
         </style>
         """,
@@ -450,8 +490,8 @@ def inject_custom_css():
 def render_footer():
     st.markdown(
         f"""
-        <br><hr>
-        <p style='text-align: center; font-size: 12px; color: #888888;'>
+        <br><hr style="border-color: #1e293b;">
+        <p style='text-align: center; font-size: 13px; color: #64748b;'>
             <b>ShiftIA</b> — {t('footer_text')}
         </p>
         """,
@@ -498,7 +538,7 @@ def render_interactive_wizard():
         f"""
         <div class="wizard-box">
             <h2 style="margin:0; color:#38bdf8;">🧙‍♂️ Configurazione Guidata Iniziale — {az}</h2>
-            <p style="color:#cbd5e1; margin-top:4px;">Configura la tua struttura in 4 semplici passaggi.</p>
+            <p style="color:#cbd5e1; margin-top:6px;">Configura la tua struttura in 4 semplici passaggi.</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -518,7 +558,7 @@ def render_interactive_wizard():
         mansioni_str = st.text_input("Inserisci le mansioni separate da virgola:", value="Operatore, Responsabile, Assistente")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("⬅️ Indietro"):
+            if st.button("⬅️ Indietro", use_container_width=True):
                 st.session_state.wizard_step = 1
                 st.rerun()
         with c2:
@@ -532,7 +572,7 @@ def render_interactive_wizard():
         turni_str = st.text_input("Inserisci i turni separati da virgola:", value="Turno Mattina, Turno Pomeriggio, Turno Notte")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("⬅️ Indietro"):
+            if st.button("⬅️ Indietro", use_container_width=True):
                 st.session_state.wizard_step = 2
                 st.rerun()
         with c2:
@@ -547,7 +587,7 @@ def render_interactive_wizard():
         chiusure = st.multiselect("Giorni di chiusura:", options=giorni_comp, default=[])
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("⬅️ Indietro"):
+            if st.button("⬅️ Indietro", use_container_width=True):
                 st.session_state.wizard_step = 3
                 st.rerun()
         with c2:
@@ -567,10 +607,10 @@ def schermata_landing():
     st.markdown(
         f"""
         <div class="welcome-card">
-            <div style="font-size:14px; color:#38bdf8; font-weight:bold; margin-bottom:8px;">{t('badge')}</div>
+            <div style="font-size:14px; color:#38bdf8; font-weight:700; margin-bottom:8px; text-transform: uppercase; letter-spacing: 1px;">{t('badge')}</div>
             <div class="welcome-title">🤖 ShiftIA</div>
-            <div style="font-size:18px; color:#cbd5e1; margin-bottom:12px;"><b>{t('tagline')}</b></div>
-            <p style="font-size: 14px; color: #94a3b8; max-width: 650px; margin: 0 auto;">{t('intro_desc')}</p>
+            <div style="font-size:19px; color:#cbd5e1; margin-bottom:14px;"><b>{t('tagline')}</b></div>
+            <p style="font-size: 15px; color: #94a3b8; max-width: 680px; margin: 0 auto; line-height: 1.5;">{t('intro_desc')}</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -586,7 +626,7 @@ def schermata_landing():
         with col_az_del:
             st.write("")
             st.write("")
-            if st.button("🗑️ Elimina", help="Elimina azienda"):
+            if st.button("🗑️ Elimina", help="Elimina azienda", use_container_width=True):
                 elimina_azienda(az_scelta)
                 st.success(f"Azienda '{az_scelta}' eliminata!")
                 st.rerun()
@@ -651,12 +691,13 @@ def pannello_gestore():
     st.sidebar.title(t("panel_title"))
     st.sidebar.write(f"🏢 Azienda: **{st.session_state.azienda_corrente}**")
     
-    if st.sidebar.button(t("logout_btn")):
+    if st.sidebar.button(t("logout_btn"), use_container_width=True):
         st.session_state.ruolo_accesso = None
         st.session_state.autenticato_gestore = False
         st.session_state.azienda_corrente = None
         st.rerun()
 
+    st.sidebar.markdown("---")
     st.sidebar.checkbox("Mostra suggerimenti IA", value=st.session_state.show_tips, key="show_tips")
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -676,7 +717,7 @@ def pannello_gestore():
             nuovo_rep = st.text_input("Nome Nuovo Reparto", key="input_nuovo_rep")
         with col_r2:
             st.write("")
-            if st.button(t("add_reparto")):
+            if st.button(t("add_reparto"), use_container_width=True):
                 if nuovo_rep and nuovo_rep not in st.session_state.reparti_custom:
                     st.session_state.reparti_custom.append(nuovo_rep)
                     salva_dati_locali()
@@ -690,7 +731,7 @@ def pannello_gestore():
             nuova_mans = st.text_input("Nome Nuova Mansione", key="input_nuova_mans")
         with col_m2:
             st.write("")
-            if st.button(t("add_mansione")):
+            if st.button(t("add_mansione"), use_container_width=True):
                 if nuova_mans and nuova_mans not in st.session_state.mansioni_custom:
                     st.session_state.mansioni_custom.append(nuova_mans)
                     salva_dati_locali()
@@ -709,7 +750,7 @@ def pannello_gestore():
             with c_cog:
                 cognome_d = st.text_input("Cognome Dipendente")
             
-            if st.form_submit_button("➕ Aggiungi Nuovo Dipendente"):
+            if st.form_submit_button("➕ Aggiungi Nuovo Dipendente", use_container_width=True):
                 if nome_d and cognome_d:
                      nuovo_dip = {
                          "id": str(len(st.session_state.dipendenti) + 1),
@@ -754,7 +795,7 @@ def pannello_gestore():
                     key="editor_staff_mansioni"
                 )
                 
-                if st.button(t("save_changes"), type="primary"):
+                if st.button(t("save_changes"), type="primary", use_container_width=True):
                     nuova_lista_dipendenti = []
                     for index, row in df_modificato.iterrows():
                         d_id = str(row["ID"])
@@ -788,7 +829,7 @@ def pannello_gestore():
             df_fabb = get_fabbisogno_reparto_df(rep_sel)
             edited_df = st.data_editor(df_fabb, key=f"fabb_{rep_sel}", use_container_width=True)
             st.session_state.fabbisogno_per_reparto[rep_sel] = edited_df
-            if st.button(t("save_changes")):
+            if st.button(t("save_changes"), use_container_width=True):
                 salva_dati_locali()
                 st.success("Fabbisogno salvato correttamente!")
 
@@ -805,7 +846,7 @@ def pannello_gestore():
                 d_scelto = st.selectbox("Dipendente", options=dip_nomi)
                 g_scelto = st.selectbox("Giorno", options=giorni_sett)
                 motivo = st.selectbox("Motivo", options=["Ferie", "Permesso", "Malattia"])
-                if st.form_submit_button("Registra Assenza"):
+                if st.form_submit_button("Registra Assenza", use_container_width=True):
                     st.session_state.registro_assenze.append({"Dipendente": d_scelto, "Giorno": g_scelto, "Motivo": motivo})
                     salva_dati_locali()
                     st.success("Assenza registrata!")
@@ -842,7 +883,7 @@ def pannello_gestore():
     with tab6:
         st.subheader("⚙️ Impostazioni e Archivio")
         st.write("Puoi resettare o cancellare i dati dell'azienda corrente.")
-        if st.button("🗑️ Elimina Azienda Corrente", type="primary"):
+        if st.button("🗑️ Elimina Azienda Corrente", type="primary", use_container_width=True):
             az_corr = st.session_state.azienda_corrente
             elimina_azienda(az_corr)
             st.success("Azienda eliminata. Verrai reindirizzato.")
@@ -851,7 +892,7 @@ def pannello_gestore():
 def pannello_dipendente():
     st.sidebar.title("👤 Area Dipendente")
     st.sidebar.write(f"🏢 Azienda: **{st.session_state.azienda_corrente}**")
-    if st.sidebar.button(t("logout_btn")):
+    if st.sidebar.button(t("logout_btn"), use_container_width=True):
         st.session_state.ruolo_accesso = None
         st.session_state.dipendente_corrente = None
         st.session_state.azienda_corrente = None
@@ -886,7 +927,7 @@ def main():
             az_sel = st.selectbox("Seleziona Azienda:", options=elenco_aziende)
             imposta_azienda_attiva(az_sel)
             password_input = st.text_input("Password Gestore", type="password")
-            if st.button(t("login_btn"), type="primary"):
+            if st.button(t("login_btn"), type="primary", use_container_width=True):
                 st.session_state.autenticato_gestore = True
                 st.success("Accesso effettuato!")
                 st.rerun()

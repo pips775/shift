@@ -210,39 +210,33 @@ def carica_dati_locali():
     else:
         st.session_state.aziende = {}
 
-def imposta_azienda_attiva(nome_az):
-    st.session_state.azienda_corrente = nome_az
-    dati_az = st.session_state.aziende.get(nome_az, {})
+def imposta_azienda_attiva(az_selezionata_login):
+    """
+    Imposta l'azienda attiva in session_state gestendo in sicurezza
+    il caso in cui il database sia vuoto o l'azienda non venga trovata.
+    """
+    # Se non viene passata alcuna azienda (es. valore None o vuoto)
+    if not az_selezionata_login:
+        st.session_state.azienda_attiva = None
+        st.session_state.lista_gestori = []
+        return
 
+    # Recupero dei dati dell'azienda (adatta la funzione se usi un altro metodo)
+    dati_az = None
+    if "aziende" in st.session_state and isinstance(st.session_state.aziende, dict):
+        dati_az = st.session_state.aziende.get(az_selezionata_login)
+    elif "ottieni_dati_azienda" in globals():
+        dati_az = ottieni_dati_azienda(az_selezionata_login)
+
+    # CONTROLLO ANTI-CRASH: Evita l'AttributeError se dati_az è None o non è un dizionario
+    if not dati_az or not isinstance(dati_az, dict):
+        st.session_state.azienda_attiva = None
+        st.session_state.lista_gestori = []
+        return
+
+    # Assegnazione sicura dello stato
+    st.session_state.azienda_attiva = az_selezionata_login
     st.session_state.lista_gestori = dati_az.get("lista_gestori", [])
-    st.session_state.reparti_custom = dati_az.get("reparti_custom", [])
-    st.session_state.mansioni_custom = dati_az.get("mansioni_custom", [])
-    st.session_state.dipendenti = dati_az.get("dipendenti", [])
-    st.session_state.config_orari_attivita = dati_az.get("config_orari_attivita", {
-        "giorni_chiusura": [],
-        "turni_definiti": ["Turno Mattina", "Turno Pomeriggio", "Turno Notte"]
-    })
-
-    fab_raw = dati_az.get("fabbisogno_per_reparto", {})
-    fab_restored = {}
-    for k, v in fab_raw.items():
-        fab_restored[k] = pd.DataFrame(v) if isinstance(v, list) else v
-    st.session_state.fabbisogno_per_reparto = fab_restored
-
-    st.session_state.registro_assenze = dati_az.get("registro_assenze", [])
-
-    arc_raw = dati_az.get("archivio_turni", {})
-    arc_restored = {}
-    for k, v in arc_raw.items():
-        arc_restored[k] = {
-            "settimana": v["settimana"],
-            "dataframe": pd.DataFrame(v["dataframe"]) if isinstance(v["dataframe"], list) else v["dataframe"]
-        }
-    st.session_state.archivio_turni = arc_restored
-    st.session_state.chat_messaggi = dati_az.get("chat_messaggi", [])
-    st.session_state.richieste_scambio = dati_az.get("richieste_scambio", [])
-    st.session_state.wizard_completato = dati_az.get("wizard_completato", False)
-
 # ==========================================
 # 3. INIZIALIZZAZIONE SESSION STATE
 # ==========================================

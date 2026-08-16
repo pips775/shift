@@ -318,7 +318,17 @@ def genera_turni_ottimizzati():
         return None
         
     df_result = pd.DataFrame(programmazione)
-    griglia_pivot = df_result.pivot_table(index="Dipendente", columns="Giorno", values="Turno", aggfunc=lambda x: ' / '.join(x)).fillna("RIPOSO")
+    giorni_ordinati = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
+    
+    griglia_pivot = df_result.pivot_table(
+        index="Dipendente", 
+        columns="Giorno", 
+        values="Turno", 
+        aggfunc=lambda x: ' / '.join(x)
+    )
+    
+    colonne_presenti = [g for g in giorni_ordinati if g in griglia_pivot.columns]
+    griglia_pivot = griglia_pivot.reindex(columns=colonne_presenti).fillna("RIPOSO")
     return griglia_pivot
 
 # ==========================================
@@ -397,7 +407,7 @@ def get_fabbisogno_reparto_df(nome_reparto):
     return st.session_state.fabbisogno_per_reparto[nome_reparto]
 
 # ==========================================
-# 5. STILI CSS CUSTOM (GRAFICA ORIGINALE)
+# 5. STILI CSS CUSTOM
 # ==========================================
 def inject_custom_css():
     st.markdown(
@@ -607,7 +617,7 @@ def schermata_landing():
                     "config_orari_attivita": {"giorni_chiusura": [], "turni_definiti": ["Turno Mattina", "Turno Pomeriggio"]},
                     "fabbisogno_per_reparto": {},
                     "registro_assenze": [],
-                    "archivio_turni": {},
+                    "archivio_turni": [],
                     "chat_messaggi": [],
                     "richieste_scambio": [],
                     "wizard_completato": False
@@ -692,7 +702,6 @@ def pannello_gestore():
         render_tip("tip_staff")
         st.subheader("👥 Gestione Personale e Competenze (Mansioni)")
         
-        # Aggiunta rapida nuovo dipendente
         with st.form("form_aggiungi_dip"):
             c_nom, c_cog = st.columns(2)
             with c_nom:
@@ -724,7 +733,6 @@ def pannello_gestore():
             if not st.session_state.mansioni_custom:
                 st.warning("⚠️ Aggiungi prima almeno una mansione nel tab 'Struttura Aziendale'.")
             else:
-                # Creiamo una tabella sotto forma di matrice (Dipendente vs Mansioni con spunte booleane)
                 righe_matrice = []
                 for d in st.session_state.dipendenti:
                     riga = {
@@ -739,7 +747,6 @@ def pannello_gestore():
                 
                 df_matrice = pd.DataFrame(righe_matrice)
                 
-                # Usiamo st.data_editor per consentire le spunte interattive
                 df_modificato = st.data_editor(
                     df_matrice,
                     disabled=["ID", "Nome", "Cognome"],
@@ -748,14 +755,12 @@ def pannello_gestore():
                 )
                 
                 if st.button(t("save_changes"), type="primary"):
-                    # Sincronizziamo i cambiamenti fatti tramite le spunte con lo state
                     nuova_lista_dipendenti = []
                     for index, row in df_modificato.iterrows():
                         d_id = str(row["ID"])
                         d_nome = row["Nome"]
                         d_cognome = row["Cognome"]
                         
-                        # Raccogliamo le mansioni spuntate per questo dipendente
                         mansioni_spuntate = []
                         for m in st.session_state.mansioni_custom:
                             if row[m]:

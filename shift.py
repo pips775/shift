@@ -19,8 +19,8 @@ DB_FILE = "shiftia_db.json"
 # ==========================================
 TRANSLATIONS = {
     "IT": {
-        "tagline": "La pianificazione dei turni per qualsiasi settore aziendale.",
-        "badge": "✨ Intelligenza Artificiale per la gestione del personale",
+        "tagline": "La pianificazione intelligente dei turni per qualsiasi settore aziendale.",
+        "badge": "✨ Intelligenza Artificiale & Workforce Management",
         "intro_desc": "Crea o seleziona la tua Azienda / Workspace simulato per pianificare i turni in totale autonomia.",
         "role_employee_title": "👤 DIPENDENTE / OPERATORE",
         "role_employee_desc": "Consulta i tuoi turni, gestisci la disponibilità e proponi scambi con i colleghi.",
@@ -55,14 +55,14 @@ TRANSLATIONS = {
         "generate_btn": "🤖 GENERAZIONE OTTIMIZZATA TURNI",
         "publish_btn": "🔒 PUBBLICA PIANIFICAZIONE PER IL PERSONALE",
         "tip_struttura": "Configura i reparti e le mansioni operative della tua struttura.",
-        "tip_staff": "Puoi modificare i dati e aggiungere più mansioni direttamente nella tabella qui sotto.",
+        "tip_staff": "Usa le spunte nella tabella per assegnare o rimuovere le mansioni ai dipendenti in tempo reale.",
         "tip_fabbisogno": "Imposta quante persone servono per ogni specifico turno nei giorni della settimana.",
         "tip_assenze": "Registra ferie o permessi. L'algoritmo li escluderà dal calcolo turni.",
         "tip_generatore": "L'algoritmo calcola i turni incrociando: Fabbisogno Reparto, Ore Max, Giorni di Riposo e Assenze."
     },
     "EN": {
-        "tagline": "Shift planning for any business sector.",
-        "badge": "✨ Artificial Intelligence for workforce management",
+        "tagline": "Smart shift planning for any business sector.",
+        "badge": "✨ Artificial Intelligence & Workforce Management",
         "intro_desc": "Create or select your simulated Company / Workspace to schedule shifts independently.",
         "role_employee_title": "👤 EMPLOYEE / OPERATOR",
         "role_employee_desc": "View your shifts, manage availability, and propose shift swaps with colleagues.",
@@ -97,14 +97,14 @@ TRANSLATIONS = {
         "generate_btn": "🤖 OPTIMIZED SHIFT GENERATION",
         "publish_btn": "🔒 PUBLISH SCHEDULE TO STAFF",
         "tip_struttura": "Configure departments and operational tasks for your organization.",
-        "tip_staff": "You can edit staff info and assign roles directly inside the table below.",
+        "tip_staff": "Use the checkboxes in the table to assign or remove roles from employees.",
         "tip_fabbisogno": "Define how many staff members are required for each specific shift.",
         "tip_assenze": "Register leave or time-off. The algorithm will exclude them from shift assignment.",
         "tip_generatore": "The algorithm calculates shifts cross-referencing Department Needs, Max Hours, and Absences."
     },
     "ES": {
-        "tagline": "Planificación de turnos para cualquier sector empresarial.",
-        "badge": "✨ Inteligencia Artificial para la gestión del personal",
+        "tagline": "Planificación inteligente de turnos para cualquier sector.",
+        "badge": "✨ Inteligencia Artificial y Gestión de Personal",
         "intro_desc": "Crea o selecciona tu Empresa / Espacio simulado para planificar turnos de forma independiente.",
         "role_employee_title": "👤 EMPLEADO / OPERARIO",
         "role_employee_desc": "Consulta tus turnos, gestiona disponibilidad y propone intercambios con compañeros.",
@@ -139,7 +139,7 @@ TRANSLATIONS = {
         "generate_btn": "🤖 GENERACIÓN OPTIMIZADA TURNOS",
         "publish_btn": "🔒 PUBLICAR PROGRAMACIÓN AL PERSONAL",
         "tip_struttura": "Configura los departamentos y funciones operativas de tu empresa.",
-        "tip_staff": "Puedes editar la información y asignar múltiples funciones directamente en la tabla.",
+        "tip_staff": "Usa las casillas en la tabla para asignar o quitar funciones a los empleados.",
         "tip_fabbisogno": "Define cuántas personas se necesitan para cada turno específico.",
         "tip_assenze": "Registra vacaciones o permisos. El algoritmo los excluirá.",
         "tip_generatore": "El algoritmo calcula los turnos cruzando necesidades de departamento y ausencias."
@@ -280,7 +280,6 @@ def genera_turni_ottimizzati():
         random.shuffle(pool)
         lavorato_oggi = set()
 
-        # Escludi dipendenti in ferie/assenza oggi
         dipendenti_disponibili = []
         for d in pool:
             d_nome = f"{d.get('nome', '')} {d.get('cognome', '')}".strip()
@@ -398,7 +397,7 @@ def get_fabbisogno_reparto_df(nome_reparto):
     return st.session_state.fabbisogno_per_reparto[nome_reparto]
 
 # ==========================================
-# 5. STILI CSS CUSTOM
+# 5. STILI CSS CUSTOM (GRAFICA ORIGINALE)
 # ==========================================
 def inject_custom_css():
     st.markdown(
@@ -407,14 +406,15 @@ def inject_custom_css():
         .welcome-card {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             border-radius: 16px;
-            padding: 24px;
+            padding: 30px;
             text-align: center;
             color: #ffffff;
             margin-bottom: 24px;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
         }
         .welcome-title {
-            font-size: 36px;
+            font-size: 42px;
             font-weight: 800;
             background: linear-gradient(90deg, #38bdf8, #a855f7);
             -webkit-background-clip: text;
@@ -427,6 +427,10 @@ def inject_custom_css():
             border-radius: 16px;
             padding: 24px;
             margin-bottom: 24px;
+        }
+        .stButton>button {
+            border-radius: 8px;
+            font-weight: 600;
         }
         </style>
         """,
@@ -686,9 +690,9 @@ def pannello_gestore():
 
     with tab2:
         render_tip("tip_staff")
-        st.subheader("👥 Gestione Personale Dipendente")
+        st.subheader("👥 Gestione Personale e Competenze (Mansioni)")
         
-        # Form aggiunta dipendente
+        # Aggiunta rapida nuovo dipendente
         with st.form("form_aggiungi_dip"):
             c_nom, c_cog = st.columns(2)
             with c_nom:
@@ -696,16 +700,13 @@ def pannello_gestore():
             with c_cog:
                 cognome_d = st.text_input("Cognome Dipendente")
             
-            mansioni_disp = st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Operatore"]
-            mans_scelta = st.multiselect("Mansioni / Competenze", options=mansioni_disp, default=[mansioni_disp[0]])
-            
-            if st.form_submit_button("➕ Aggiungi Dipendente"):
+            if st.form_submit_button("➕ Aggiungi Nuovo Dipendente"):
                 if nome_d and cognome_d:
                      nuovo_dip = {
                          "id": str(len(st.session_state.dipendenti) + 1),
                          "nome": nome_d,
                          "cognome": cognome_d,
-                         "mansioni": mans_scelta
+                         "mansioni": [st.session_state.mansioni_custom[0]] if st.session_state.mansioni_custom else ["Operatore"]
                      }
                      st.session_state.dipendenti.append(nuovo_dip)
                      salva_dati_locali()
@@ -714,9 +715,63 @@ def pannello_gestore():
                 else:
                     st.error("Inserisci nome e cognome.")
 
-        if st.session_state.dipendenti:
-            df_dip = pd.DataFrame(st.session_state.dipendenti)
-            st.dataframe(df_dip, use_container_width=True)
+        st.markdown("---")
+        st.subheader("🛠️ Tabella Interattiva con Spunte per Assegnazione Mansioni")
+        
+        if not st.session_state.dipendenti:
+            st.info("ℹ️ Nessun dipendente inserito. Aggiungine uno sopra per abilitare la tabella con le spunte.")
+        else:
+            if not st.session_state.mansioni_custom:
+                st.warning("⚠️ Aggiungi prima almeno una mansione nel tab 'Struttura Aziendale'.")
+            else:
+                # Creiamo una tabella sotto forma di matrice (Dipendente vs Mansioni con spunte booleane)
+                righe_matrice = []
+                for d in st.session_state.dipendenti:
+                    riga = {
+                        "ID": d.get("id"),
+                        "Nome": d.get("nome"),
+                        "Cognome": d.get("cognome")
+                    }
+                    mansioni_attuali = d.get("mansioni", [])
+                    for m in st.session_state.mansioni_custom:
+                        riga[m] = m in mansioni_attuali
+                    righe_matrice.append(riga)
+                
+                df_matrice = pd.DataFrame(righe_matrice)
+                
+                # Usiamo st.data_editor per consentire le spunte interattive
+                df_modificato = st.data_editor(
+                    df_matrice,
+                    disabled=["ID", "Nome", "Cognome"],
+                    use_container_width=True,
+                    key="editor_staff_mansioni"
+                )
+                
+                if st.button(t("save_changes"), type="primary"):
+                    # Sincronizziamo i cambiamenti fatti tramite le spunte con lo state
+                    nuova_lista_dipendenti = []
+                    for index, row in df_modificato.iterrows():
+                        d_id = str(row["ID"])
+                        d_nome = row["Nome"]
+                        d_cognome = row["Cognome"]
+                        
+                        # Raccogliamo le mansioni spuntate per questo dipendente
+                        mansioni_spuntate = []
+                        for m in st.session_state.mansioni_custom:
+                            if row[m]:
+                                mansioni_spuntate.append(m)
+                                
+                        nuova_lista_dipendenti.append({
+                            "id": d_id,
+                            "nome": d_nome,
+                            "cognome": d_cognome,
+                            "mansioni": mansioni_spuntate
+                        })
+                    
+                    st.session_state.dipendenti = nuova_lista_dipendenti
+                    salva_dati_locali()
+                    st.success("✅ Modifiche e spunte mansioni salvate con successo!")
+                    st.rerun()
 
     with tab3:
         render_tip("tip_fabbisogno")

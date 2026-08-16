@@ -161,6 +161,14 @@ def t(key):
     lang = st.session_state.get("lingua", "IT")
     return TRANSLATIONS.get(lang, TRANSLATIONS["IT"]).get(key, key)
 
+def ottieni_etichetta_gestore(g):
+    if isinstance(g, dict):
+        nome = g.get('nome', '')
+        cognome = g.get('cognome', '')
+        res = f"{nome} {cognome}".strip()
+        return res if res else "Gestore Senza Nome"
+    return str(g)
+
 # ==========================================
 # 2. PERSISTENZA DATI LOCALE MULTI-AZIENDA
 # ==========================================
@@ -216,10 +224,12 @@ def imposta_azienda_attiva(az_selezionata_login):
         st.session_state.lista_gestori = []
         return
 
-    dati_az = st.session_state.aziende.get(az_selezionata_login) if "aziende" in st.session_state else None
+    dati_az = None
+    if "aziende" in st.session_state and isinstance(st.session_state.aziende, dict):
+        dati_az = st.session_state.aziende.get(az_selezionata_login)
 
     if not dati_az or not isinstance(dati_az, dict):
-        st.session_state.azienda_corrente = az_selezionata_login
+        st.session_state.azienda_corrente = None
         st.session_state.lista_gestori = []
         return
 
@@ -233,42 +243,47 @@ def imposta_azienda_attiva(az_selezionata_login):
         "turni_definiti": ["Turno Mattina", "Turno Pomeriggio", "Turno Notte"]
     })
     
-    # Ripristino Fabbisogno DataFrames
-    fab_raw = dati_az.get("fabbisogno_per_reparto", {})
-    fab_dfs = {}
-    for k, v in fab_raw.items():
+    fabb_raw = dati_az.get("fabbisogno_per_reparto", {})
+    fabb_df = {}
+    for k, v in fabb_raw.items():
         if isinstance(v, list):
-            fab_dfs[k] = pd.DataFrame(v)
-        else:
-            fab_dfs[k] = v
-    st.session_state.fabbisogno_per_reparto = fab_dfs
+            fabb_df[k] = pd.DataFrame(v)
+        elif isinstance(v, pd.DataFrame):
+            fabb_df[k] = v
+    st.session_state.fabbisogno_per_reparto = fabb_df
 
     st.session_state.registro_assenze = dati_az.get("registro_assenze", [])
     
-    # Ripristino Archivio DataFrames
     arch_raw = dati_az.get("archivio_turni", {})
-    arch_dfs = {}
+    arch_df = {}
     for k, v in arch_raw.items():
-        if isinstance(v, dict) and "dataframe" in v:
-            df_val = pd.DataFrame(v["dataframe"]) if isinstance(v["dataframe"], list) else v["dataframe"]
-            arch_dfs[k] = {"settimana": v["settimana"], "dataframe": df_val}
-    st.session_state.archivio_turni = arch_dfs
+        df_val = pd.DataFrame(v["dataframe"]) if isinstance(v.get("dataframe"), list) else v.get("dataframe")
+        arch_df[k] = {"settimana": v.get("settimana"), "dataframe": df_val}
+    st.session_state.archivio_turni = arch_df
 
     st.session_state.chat_messaggi = dati_az.get("chat_messaggi", [])
     st.session_state.richieste_scambio = dati_az.get("richieste_scambio", [])
     st.session_state.wizard_completato = dati_az.get("wizard_completato", False)
 
+def elimina_azienda(nome_azienda):
+    """Elimina definitivamente un'azienda e resetta lo stato se era attiva."""
+    if "aziende" in st.session_state and nome_azienda in st.session_state.aziende:
+        del st.session_state.aziende[nome_azienda]
+        
+        # Se l'azienda eliminata era quella attiva, resetta la sessione
+        if st.session_state.get("azienda_corrente") == nome_azienda:
+            st.session_state.azienda_corrente = None
+            st.session_state.lista_gestori = []
+            st.session_state.autenticato_gestore = False
+            st.session_state.gestore_corrente = None
+            st.session_state.dipendente_corrente = None
+            st.session_state.ruolo_accesso = None
+            
+        salva_dati_locali()
+
 # ==========================================
 # 3. INIZIALIZZAZIONE SESSION STATE
 # ==========================================
-def safe_int(val):
-    if pd.isna(val) or val is None:
-        return 0
-    try:
-        return int(float(val))
-    except (ValueError, TypeError):
-        return 0
-
 def init_session_state():
     if "lingua" not in st.session_state:
         st.session_state.lingua = "IT"
@@ -405,59 +420,6 @@ def inject_custom_css():
             padding: 24px;
             margin-bottom: 24px;
         }
-
-        .calendar-card {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 10px;
-            padding: 10px;
-            min-height: 100px;
-            color: #f8fafc;
-            margin-bottom: 10px;
-        }
-
-        .calendar-card-today {
-            background-color: #0f172a;
-            border: 2px solid #38bdf8;
-            border-radius: 10px;
-            padding: 10px;
-            min-height: 100px;
-            color: #ffffff;
-            margin-bottom: 10px;
-        }
-
-        .day-number {
-            font-size: 18px;
-            font-weight: bold;
-            color: #38bdf8;
-        }
-
-        .badge-event {
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            margin-top: 4px;
-            display: block;
-        }
-        .badge-assenza { background-color: #ef4444; color: white; }
-        
-        .chat-bubble-me {
-            background-color: #0284c7;
-            color: white;
-            padding: 10px 14px;
-            border-radius: 12px 12px 2px 12px;
-            margin: 6px 0;
-            max-width: 80%;
-            margin-left: auto;
-        }
-        .chat-bubble-other {
-            background-color: #334155;
-            color: #f8fafc;
-            padding: 10px 14px;
-            border-radius: 12px 12px 12px 2px;
-            margin: 6px 0;
-            max-width: 80%;
-        }
         </style>
         """,
         unsafe_allow_html=True
@@ -532,7 +494,7 @@ def render_interactive_wizard():
     if step == 1:
         st.subheader("Passo 1: Aggiungi i Reparti / Settori Operativi")
         st.write("Definisci le aree di lavoro della tua azienda (es: Cucina, Sala, Reception, Magazzino).")
-        reparti_str = st.text_input("Inserisci i reparti separati da virgola:", value=" Cassa, Sala, Magazzino")
+        reparti_str = st.text_input("Inserisci i reparti separati da virgola:", value="Cassa, Sala, Magazzino")
         if st.button("Avanti ➡️ (Passo 2)", type="primary", use_container_width=True):
             st.session_state.reparti_custom = [r.strip() for r in reparti_str.split(",") if r.strip()]
             st.session_state.wizard_step = 2
@@ -576,7 +538,6 @@ def render_interactive_wizard():
         st.write("Seleziona gli eventuali giorni in cui la tua azienda rimane chiusa.")
         giorni_comp = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
         chiusure = st.multiselect("Giorni di chiusura:", options=giorni_comp, default=[])
-        
         col_w1, col_w2 = st.columns(2)
         with col_w1:
             if st.button("⬅️ Indietro"):
@@ -619,7 +580,17 @@ def schermata_landing():
     elenco_aziende = list(st.session_state.aziende.keys())
 
     if elenco_aziende:
-        az_scelta = st.selectbox("📍 Azienda / Workspace Esistente:", options=elenco_aziende)
+        col_az_sel, col_az_del = st.columns([4, 1])
+        with col_az_sel:
+            az_scelta = st.selectbox("📍 Azienda / Workspace Esistente:", options=elenco_aziende)
+        with col_az_del:
+            st.write("") # spaziatore verticale
+            st.write("")
+            if st.button("🗑️ Elimina", help=f"Elimina definitivamente l'azienda '{az_scelta}'"):
+                elimina_azienda(az_scelta)
+                st.success(f"Azienda '{az_scelta}' eliminata con successo!")
+                st.rerun()
+
         if st.button("👉 Seleziona questa Azienda", type="secondary", use_container_width=True):
             imposta_azienda_attiva(az_scelta)
             st.success(f"Azienda attiva impostata su: **{az_scelta}**")
@@ -736,7 +707,7 @@ def schermata_auth_gestore():
             if not st.session_state.lista_gestori:
                 st.info(f"ℹ️ Nessun gestore per l'azienda '{az_selezionata_login}'. Registra un gestore a destra.")
             else:
-                opzioni_gestori = [f"{g['nome']} {g['cognome']}" for g in st.session_state.lista_gestori]
+                opzioni_gestori = [ottieni_etichetta_gestore(g) for g in st.session_state.lista_gestori]
                 with st.form("form_login_gestore", clear_on_submit=False):
                     gestore_scelto_str = st.selectbox("Seleziona Profilo Gestore:", options=opzioni_gestori)
                     pwd_in = st.text_input(t("pass_label"), type="password")
@@ -745,10 +716,12 @@ def schermata_auth_gestore():
                     if btn_log:
                         idx = opzioni_gestori.index(gestore_scelto_str)
                         gestore_obj = st.session_state.lista_gestori[idx]
-                        if pwd_in == gestore_obj["password"]:
+                        pwd_corretta = gestore_obj.get("password") if isinstance(gestore_obj, dict) else None
+                        
+                        if pwd_corretta and pwd_in == pwd_corretta:
                             st.session_state.gestore_corrente = gestore_obj
                             st.session_state.autenticato_gestore = True
-                            st.success(f"Benvenuto, {gestore_obj['nome']}!")
+                            st.success(f"Benvenuto, {gestore_scelto_str}!")
                             st.rerun()
                         else:
                             st.error("❌ Password non corretta.")
@@ -756,15 +729,22 @@ def schermata_auth_gestore():
     render_footer()
 
 # ==========================================
-# 9. PANNELLO GESTORE (TABS)
+# 9. PANNELLO GESTORE COMPLETO
 # ==========================================
-def render_pannello_gestore():
-    col_head1, col_head2 = st.columns([3, 1])
-    with col_head1:
-        st.title(f"👔 {st.session_state.azienda_corrente} — Pannello Gestore")
-        st.caption(f"Utente collegato: **{st.session_state.gestore_corrente['nome']} {st.session_state.gestore_corrente['cognome']}**")
-    with col_head2:
-        if st.button(t("logout_btn"), use_container_width=True):
+def render_gestore_panel():
+    st.markdown(
+        f"""
+        <div class="user-welcome-box">
+            <h3>👔 Pannello Controllo Gestore — {st.session_state.azienda_corrente}</h3>
+            <p>Benvenuto, <b>{ottieni_etichetta_gestore(st.session_state.gestore_corrente)}</b>!</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    top_l, top_r = st.columns([3, 1])
+    with top_r:
+        if st.button(t("logout_btn"), type="secondary", use_container_width=True):
             st.session_state.autenticato_gestore = False
             st.session_state.gestore_corrente = None
             st.session_state.ruolo_accesso = None
@@ -779,237 +759,269 @@ def render_pannello_gestore():
         t("tab_impostazioni")
     ])
 
-    # ---------------- TAB 1: STRUTTURA ----------------
+    # TAB 1: Struttura Aziendale
     with tab1:
+        st.subheader("🏢 Struttura e Configurazione Reparti / Mansioni")
         render_tip("tip_struttura")
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            st.subheader(t("reparti_title"))
-            nuovo_rep = st.text_input("Nuovo Reparto:", key="in_new_rep")
-            if st.button(t("add_reparto"), key="btn_add_rep"):
+
+        col_r, col_m = st.columns(2)
+        with col_r:
+            st.markdown(f"### {t('reparti_title')}")
+            for rep in list(st.session_state.reparti_custom):
+                c_a, c_b = st.columns([3, 1])
+                c_a.write(f"• **{rep}**")
+                if c_b.button(t("delete_btn"), key=f"del_rep_{rep}"):
+                    st.session_state.reparti_custom.remove(rep)
+                    salva_dati_locali()
+                    st.rerun()
+
+            nuovo_rep = st.text_input("Nuovo Reparto:", key="input_new_rep")
+            if st.button(t("add_reparto")):
                 if nuovo_rep.strip() and nuovo_rep.strip() not in st.session_state.reparti_custom:
                     st.session_state.reparti_custom.append(nuovo_rep.strip())
                     salva_dati_locali()
                     st.rerun()
-            
-            st.write("**Reparti Attivi:**")
-            for r in list(st.session_state.reparti_custom):
-                cr1, cr2 = st.columns([3, 1])
-                cr1.write(f"• {r}")
-                if cr2.button("🗑️", key=f"del_rep_{r}"):
-                    st.session_state.reparti_custom.remove(r)
+
+        with col_m:
+            st.markdown(f"### {t('mansioni_title')}")
+            for man in list(st.session_state.mansioni_custom):
+                c_a, c_b = st.columns([3, 1])
+                c_a.write(f"• **{man}**")
+                if c_b.button(t("delete_btn"), key=f"del_man_{man}"):
+                    st.session_state.mansioni_custom.remove(man)
                     salva_dati_locali()
                     st.rerun()
 
-        with col_c2:
-            st.subheader(t("mansioni_title"))
-            nuova_man = st.text_input("Nuova Mansione:", key="in_new_man")
-            if st.button(t("add_mansione"), key="btn_add_man"):
+            nuova_man = st.text_input("Nuova Mansione:", key="input_new_man")
+            if st.button(t("add_mansione")):
                 if nuova_man.strip() and nuova_man.strip() not in st.session_state.mansioni_custom:
                     st.session_state.mansioni_custom.append(nuova_man.strip())
                     salva_dati_locali()
                     st.rerun()
-            
-            st.write("**Mansioni Attive:**")
-            for m in list(st.session_state.mansioni_custom):
-                cm1, cm2 = st.columns([3, 1])
-                cm1.write(f"• {m}")
-                if cm2.button("🗑️", key=f"del_man_{m}"):
-                    st.session_state.mansioni_custom.remove(m)
-                    salva_dati_locali()
-                    st.rerun()
 
-    # ---------------- TAB 2: STAFF ----------------
+    # TAB 2: Staff & Anagrafica
     with tab2:
+        st.subheader("👥 Anagrafica Dipendenti")
         render_tip("tip_staff")
-        st.subheader("👥 Anagrafica e Vincoli Dipendenti")
-        with st.form("form_add_dip"):
-            c_d1, c_d2, c_d3, c_d4 = st.columns(4)
-            d_nome = c_d1.text_input("Nome")
-            d_cognome = c_d2.text_input("Cognome")
-            d_rep = c_d3.selectbox("Reparto", options=st.session_state.reparti_custom if st.session_state.reparti_custom else ["Generale"])
-            d_man = c_d4.selectbox("Mansione", options=st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Operatore"])
-            
-            c_d5, c_d6, c_d7 = st.columns(3)
-            d_ore = c_d5.number_input("Ore Max Settimanali", min_value=8, max_value=48, value=40)
-            d_riposi = c_d6.number_input("Giorni Riposo Spettanti", min_value=1, max_value=4, value=2)
-            d_contratto = c_d7.selectbox("Contratto", ["Full-Time", "Part-Time 30h", "Part-Time 20h"])
-            
-            btn_add_dip = st.form_submit_button("➕ Aggiungi Dipendente", use_container_width=True)
-            if btn_add_dip and d_nome.strip() and d_cognome.strip():
-                new_dip = {
-                    "id": len(st.session_state.dipendenti) + 1,
-                    "nome": d_nome.strip(),
-                    "cognome": d_cognome.strip(),
-                    "reparto": d_rep,
-                    "mansione": d_man,
-                    "ore_max": d_ore,
-                    "riposi_spettanti": d_riposi,
-                    "contratto": d_contratto
-                }
-                st.session_state.dipendenti.append(new_dip)
-                salva_dati_locali()
-                st.rerun()
+
+        with st.expander("➕ Registra Nuovo Dipendente"):
+            with st.form("form_add_dipendente", clear_on_submit=True):
+                c1, c2 = st.columns(2)
+                nome_d = c1.text_input("Nome:")
+                cognome_d = c2.text_input("Cognome:")
+                rep_d = c1.selectbox("Reparto:", options=st.session_state.reparti_custom if st.session_state.reparti_custom else ["Generale"])
+                man_d = c2.selectbox("Mansione:", options=st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Operatore"])
+                ore_max = c1.number_input("Ore Max Settimanali:", min_value=8, max_value=60, value=40)
+                gg_riposo = c2.number_input("Giorni Riposo Spettanti:", min_value=1, max_value=4, value=2)
+                pwd_dip = c1.text_input("Password Dipendente:", type="password")
+
+                if st.form_submit_button("Aggiungi Dipendente"):
+                    if nome_d and cognome_d:
+                        nuovo_dip = {
+                            "id": len(st.session_state.dipendenti) + 1,
+                            "nome": nome_d,
+                            "cognome": cognome_d,
+                            "reparto": rep_d,
+                            "mansione": man_d,
+                            "ore_max": ore_max,
+                            "gg_riposo": gg_riposo,
+                            "password": pwd_dip
+                        }
+                        st.session_state.dipendenti.append(nuovo_dip)
+                        salva_dati_locali()
+                        st.success(f"Dipendente {nome_d} {cognome_d} registrato!")
+                        st.rerun()
 
         if st.session_state.dipendenti:
-            st.dataframe(pd.DataFrame(st.session_state.dipendenti), use_container_width=True)
+            df_dip = pd.DataFrame(st.session_state.dipendenti)
+            st.dataframe(df_dip[["id", "nome", "cognome", "reparto", "mansione", "ore_max", "gg_riposo"]], use_container_width=True)
 
-    # ---------------- TAB 3: FABBISOGNO ----------------
+    # TAB 3: Fabbisogno Operativo
     with tab3:
+        st.subheader("📈 Definizione Fabbisogno Operativo")
         render_tip("tip_fabbisogno")
-        if not st.session_state.reparti_custom:
-            st.warning("⚠️ Definisci almeno un reparto nella scheda 'Struttura Aziendale'.")
-        else:
-            rep_fab = st.selectbox("Seleziona Reparto per Fabbisogno:", options=st.session_state.reparti_custom)
-            df_fab = get_fabbisogno_reparto_df(rep_fab)
-            st.write(f"Configura quante persone servono per il reparto **{rep_fab}**:")
-            edited_df = st.data_editor(df_fab, key=f"editor_fab_{rep_fab}", use_container_width=True)
-            if st.button("💾 Salva Fabbisogno Reparto", type="primary"):
-                st.session_state.fabbisogno_per_reparto[rep_fab] = edited_df
-                salva_dati_locali()
-                st.success("Fabbisogno salvato!")
 
-    # ---------------- TAB 4: ASSENZE ----------------
+        if not st.session_state.reparti_custom:
+            st.warning("⚠️ Aggiungi prima almeno un reparto nella sezione 'Struttura Aziendale'.")
+        else:
+            rep_sel_fabb = st.selectbox("Seleziona Reparto per Fabbisogno:", options=st.session_state.reparti_custom)
+            df_fabb = get_fabbisogno_reparto_df(rep_sel_fabb)
+            
+            st.write(f"Inserisci il numero di operatori richiesti per **{rep_sel_fabb}**:")
+            df_edited = st.data_editor(df_fabb, num_rows="dynamic", use_container_width=True)
+
+            if st.button("💾 Salva Fabbisogno Reparto"):
+                st.session_state.fabbisogno_per_reparto[rep_sel_fabb] = df_edited
+                salva_dati_locali()
+                st.success("Fabbisogno salvato correttamente!")
+
+    # TAB 4: Assenze
     with tab4:
+        st.subheader("📅 Registrazione Assenze / Ferie")
         render_tip("tip_assenze")
-        st.subheader("📅 Registro Assenze e Permessi")
-        if st.session_state.dipendenti:
-            nami_dip = [f"{d['nome']} {d['cognome']}" for d in st.session_state.dipendenti]
+
+        if not st.session_state.dipendenti:
+            st.info("Nessun dipendente presente in anagrafica.")
+        else:
+            list_dip_names = [f"{d['nome']} {d['cognome']}" for d in st.session_state.dipendenti]
             with st.form("form_assenza"):
-                ca1, ca2, ca3 = st.columns(3)
-                dip_ass = ca1.selectbox("Dipendente:", options=nami_dip)
-                tipo_ass = ca2.selectbox("Motivazione:", ["Ferie", "Malattia", "Permesso", "Formazione"])
-                giorno_ass = ca3.date_input("Data Assenza:", datetime.now())
-                
-                if st.form_submit_button("➕ Registra Assenza", use_container_width=True):
+                dip_ass_sel = st.selectbox("Seleziona Dipendente:", options=list_dip_names)
+                tipo_ass = st.selectbox("Tipo Assenza:", options=["Ferie", "Permesso", "Malattia"])
+                dt_ass = st.date_input("Giorno Assenza:", value=datetime.now())
+
+                if st.form_submit_button("Registra Assenza"):
                     st.session_state.registro_assenze.append({
-                        "dipendente": dip_ass,
+                        "dipendente": dip_ass_sel,
                         "tipo": tipo_ass,
-                        "data": str(giorno_ass)
+                        "data": str(dt_ass)
                     })
                     salva_dati_locali()
+                    st.success("Assenza registrata con successo!")
                     st.rerun()
-            
+
             if st.session_state.registro_assenze:
                 st.dataframe(pd.DataFrame(st.session_state.registro_assenze), use_container_width=True)
 
-    # ---------------- TAB 5: GENERATORE ----------------
+    # TAB 5: Generatore Turni IA
     with tab5:
+        st.subheader("⚡ Calcolo Generazione IA Turni")
         render_tip("tip_generatore")
-        st.subheader("⚡ Algoritmo di Generazione Otizzata Turni")
-        
-        c_gen1, c_gen2 = st.columns(2)
-        anno_gen = c_gen1.number_input("Anno:", value=datetime.now().year)
-        settimana_gen = c_gen2.number_input("Numero Settimana:", min_value=1, max_value=52, value=datetime.now().isocalendar()[1])
+
+        data_inizio = st.date_input("Data Inizio Settimana (Lunedì):", value=datetime.now())
 
         if st.button(t("generate_btn"), type="primary", use_container_width=True):
             if not st.session_state.dipendenti:
-                st.error("❌ Impossibile generare i turni: Nessun dipendente registrato!")
+                st.error("Impossibile generare turni senza dipendenti salvati!")
             else:
                 giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
-                turni_disp = st.session_state.config_orari_attivita["turni_definiti"]
-                grid_data = []
+                matrice_turni = []
 
-                for d in st.session_state.dipendenti:
-                    row = {"Dipendente": f"{d['nome']} {d['cognome']}", "Reparto": d['reparto']}
-                    riposi_assegnati = 0
+                for dip in st.session_state.dipendenti:
+                    row = {"Dipendente": f"{dip['nome']} {dip['cognome']}", "Reparto": dip['reparto']}
+                    turni_disp = st.session_state.config_orari_attivita["turni_definiti"]
                     
-                    for g in giorni:
+                    for idx_g, g in enumerate(giorni):
                         if g in st.session_state.config_orari_attivita["giorni_chiusura"]:
-                            row[g] = "🚫 Chiuso"
-                        elif riposi_assegnati < d['riposi_spettanti'] and np.random.rand() > 0.6:
-                            row[g] = "💤 RIPOSO"
-                            riposi_assegnati += 1
+                            row[g] = "CHIUSURA"
+                        elif idx_g >= (7 - dip.get("gg_riposo", 2)):
+                            row[g] = "RIPOSO"
                         else:
-                            row[g] = np.random.choice(turni_disp)
-                    
-                    # Garanzia riposi minimi
-                    for g in giorni:
-                        if riposi_assegnati < d['riposi_spettanti'] and row[g] not in ["🚫 Chiuso", "💤 RIPOSO"]:
-                            row[g] = "💤 RIPOSO"
-                            riposi_assegnati += 1
-                    
-                    grid_data.append(row)
+                            row[g] = turni_disp[idx_g % len(turni_disp)] if turni_disp else "Mattina"
 
-                st.session_state.griglia_corrente = pd.DataFrame(grid_data)
-                st.success("✅ Pianificazione generata con successo!")
+                    matrice_turni.append(row)
+
+                st.session_state.griglia_corrente = pd.DataFrame(matrice_turni)
+                salva_dati_locali()
+                st.success("✨ Griglia turni calcolata ed elaborata!")
 
         if st.session_state.griglia_corrente is not None:
             st.dataframe(st.session_state.griglia_corrente, use_container_width=True)
-            
-            img_bytes = genera_immagine_turni(st.session_state.griglia_corrente)
+
+            img_data = genera_immagine_turni(st.session_state.griglia_corrente)
             st.download_button(
-                "📥 Scarica Tabella Turni (PNG)",
-                data=img_bytes,
-                file_name=f"turni_settimana_{settimana_gen}.png",
-                mime="image/png",
-                use_container_width=True
+                "📥 Scarica Immagine Turni (PNG)",
+                data=img_data,
+                file_name=f"turni_{st.session_state.azienda_corrente}.png",
+                mime="image/png"
             )
 
-            if st.button(t("publish_btn"), type="secondary", use_container_width=True):
-                key_pub = f"Settimana_{settimana_gen}_{anno_gen}"
-                st.session_state.archivio_turni[key_pub] = {
-                    "settimana": settimana_gen,
-                    "dataframe": st.session_state.griglia_corrente
-                }
-                salva_dati_locali()
-                st.success(f"🔒 Turni per la settimana {settimana_gen} pubblicati e visibili ai dipendenti!")
-
-    # ---------------- TAB 6: IMPOSTAZIONI ----------------
+    # TAB 6: Impostazioni & Gestione Account / Eliminazione Azienda
     with tab6:
-        render_tip("tip_gestori_mgmt")
         st.subheader(t("gestori_mgmt_title"))
+        render_tip("tip_gestori_mgmt")
+
         if st.session_state.lista_gestori:
-            st.dataframe(pd.DataFrame(st.session_state.lista_gestori)[["nome", "cognome"]], use_container_width=True)
+            opzioni_gestori = [ottieni_etichetta_gestore(g) for g in st.session_state.lista_gestori]
+            g_sel = st.selectbox("Seleziona Account Gestore da Gestire:", options=opzioni_gestori)
+            idx_g = opzioni_gestori.index(g_sel)
+            target_g = st.session_state.lista_gestori[idx_g]
+
+            edit_n = st.text_input("Nome:", value=target_g.get("nome", ""))
+            edit_c = st.text_input("Cognome:", value=target_g.get("cognome", ""))
+            edit_p = st.text_input("Nuova Password:", value=target_g.get("password", ""), type="password")
+
+            c_mod, c_del = st.columns(2)
+            with c_mod:
+                if st.button(t("save_changes"), type="primary"):
+                    st.session_state.lista_gestori[idx_g]["nome"] = edit_n
+                    st.session_state.lista_gestori[idx_g]["cognome"] = edit_c
+                    st.session_state.lista_gestori[idx_g]["password"] = edit_p
+                    salva_dati_locali()
+                    st.success("Credenziali aggiornate!")
+                    st.rerun()
+
+            with c_del:
+                if st.button(t("del_gestore")):
+                    st.session_state.lista_gestori.pop(idx_g)
+                    salva_dati_locali()
+                    st.warning("Account Gestore rimosso.")
+                    st.rerun()
+
+        st.markdown("---")
+        with st.expander("🚨 Zona Pericolo: Eliminazione Azienda Corrente"):
+            az_curr = st.session_state.azienda_corrente
+            st.warning(f"Attenzione: stai per eliminare definitivamente l'azienda **{az_curr}** e tutti i relativi dati (dipendenti, reparti, turni, account).")
+            conferma_del = st.checkbox("Spunta qui per confermare l'eliminazione definitiva")
+            if st.button("🗑️ ELIMINA DEFINITIVAMENTE QUESTA AZIENDA", type="primary", disabled=not conferma_del):
+                elimina_azienda(az_curr)
+                st.success(f"L'azienda '{az_curr}' è stata eliminata con successo.")
+                st.rerun()
+
+    render_footer()
 
 # ==========================================
-# 10. PORTALE DIPENDENTE
+# 10. PANNELLO DIPENDENTE / OPERATORE
 # ==========================================
-def render_portale_dipendente():
-    col_back, col_title = st.columns([1, 4])
-    with col_back:
-        if st.button(t("back_btn")):
-            st.session_state.ruolo_accesso = None
-            st.session_state.dipendente_corrente = None
-            st.rerun()
+def render_dipendente_panel():
+    st.markdown(
+        f"""
+        <div class="user-welcome-box">
+            <h3>👤 Area Riservata Operatore — {st.session_state.azienda_corrente}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    st.title(f"👤 Portale Operatore — {st.session_state.azienda_corrente}")
+    if st.button(t("back_btn")):
+        st.session_state.ruolo_accesso = None
+        st.rerun()
 
     if not st.session_state.dipendenti:
-        st.warning("⚠️ Nessun dipendente caricato per questa azienda. Chiedi al gestore di aggiungere la tua anagrafica.")
+        st.info("ℹ️ Nessun dipendente censito per questa azienda.")
         return
 
-    nami_dip = [f"{d['nome']} {d['cognome']}" for d in st.session_state.dipendenti]
-    dip_scelto = st.selectbox("Seleziona il tuo Nome & Cognome per accedere:", options=nami_dip)
+    nomerie = [f"{d['nome']} {d['cognome']}" for d in st.session_state.dipendenti]
+    dip_scelto = st.selectbox("Seleziona il tuo Profilo:", options=nomerie)
+    pwd_d = st.text_input("Inserisci la tua Password:", type="password")
 
-    if dip_scelto:
-        st.session_state.dipendente_corrente = dip_scelto
-        st.markdown(
-            f"""
-            <div class="user-welcome-box">
-                <h3>👋 Benvenuto, {dip_scelto}!</h3>
-                <p>Consulta i tuoi turni pubblicati, invia richieste di cambio o comunica con la direzione.</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    if st.button("Accedi alla tua Griglia Turni"):
+        idx_d = nomerie.index(dip_scelto)
+        obj_d = st.session_state.dipendenti[idx_d]
 
-        st.subheader("📅 I Tuoi Turni Pubblicati")
-        if not st.session_state.archivio_turni:
-            st.info("ℹ️ Nessuna pianificazione pubblicata al momento dal gestore.")
+        if obj_d.get("password") == pwd_d:
+            st.session_state.dipendente_corrente = obj_d
+            st.success(f"Benvenuto {dip_scelto}!")
         else:
-            for k, v in st.session_state.archivio_turni.items():
-                st.write(f"**Pianificazione: {k}**")
-                df_turni = v["dataframe"]
-                if isinstance(df_turni, pd.DataFrame):
-                    my_row = df_turni[df_turni["Dipendente"] == dip_scelto]
-                    if not my_row.empty:
-                        st.dataframe(my_row, use_container_width=True)
-                    else:
-                        st.write("Nessun turno trovato per il tuo profilo in questa settimana.")
+            st.error("❌ Password errata.")
+
+    if st.session_state.dipendente_corrente:
+        st.markdown("---")
+        st.subheader("📅 I Tuoi Turni Programmati")
+        if st.session_state.griglia_corrente is not None:
+            df_g = st.session_state.griglia_corrente
+            nome_full = f"{st.session_state.dipendente_corrente['nome']} {st.session_state.dipendente_corrente['cognome']}"
+            df_my = df_g[df_g["Dipendente"] == nome_full]
+            if not df_my.empty:
+                st.dataframe(df_my, use_container_width=True)
+            else:
+                st.info("Nessun turno assegnato nella griglia corrente.")
+        else:
+            st.info("Pianificazione turni non ancora pubblicata dal gestore.")
+
+    render_footer()
 
 # ==========================================
-# 11. MAIN ROUTER
+# 11. MAIN ROUTING APPLICAZIONE
 # ==========================================
 def main():
     init_session_state()
@@ -1020,12 +1032,13 @@ def main():
     elif st.session_state.ruolo_accesso == "Gestore":
         if not st.session_state.autenticato_gestore:
             schermata_auth_gestore()
-        elif not st.session_state.wizard_completato:
-            render_interactive_wizard()
         else:
-            render_pannello_gestore()
+            if not st.session_state.wizard_completato:
+                render_interactive_wizard()
+            else:
+                render_gestore_panel()
     elif st.session_state.ruolo_accesso == "Dipendente":
-        render_portale_dipendente()
+        render_dipendente_panel()
 
 if __name__ == "__main__":
     main()

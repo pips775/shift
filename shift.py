@@ -254,7 +254,7 @@ def elimina_azienda(nome_azienda):
         salva_dati_locali()
 
 # ==========================================
-# 3. FUNZIONE SUPPORTO FABBISOGNO (RIPRISTINATA)
+# 3. FUNZIONE SUPPORTO FABBISOGNO
 # ==========================================
 def get_fabbisogno_reparto_df(nome_reparto):
     if nome_reparto not in st.session_state.fabbisogno_per_reparto:
@@ -501,7 +501,7 @@ def schermata_login_gestore():
                         "config_orari_attivita": {"giorni_chiusura": [], "turni_definiti": ["Turno Mattina", "Turno Pomeriggio"]},
                         "fabbisogno_per_reparto": {},
                         "registro_assenze": [],
-                        "archivio_turni": {},
+                        "archivio_turni": [],
                         "chat_messaggi": [],
                         "richieste_scambio": [],
                         "wizard_completato": True
@@ -557,7 +557,7 @@ def dashboard_gestore():
         st.subheader("👥 Anagrafica Personale")
         df_dip = pd.DataFrame(st.session_state.dipendenti)
         edited_df = st.data_editor(df_dip, num_rows="dynamic", use_container_width=True)
-        if st.button(t('save_changes')):
+        if st.button("Salva Staff"):
             st.session_state.dipendenti = edited_df.to_dict(orient="records")
             salva_dati_locali()
             st.success("Staff aggiornato salvato con successo!")
@@ -578,7 +578,11 @@ def dashboard_gestore():
         render_tip('tip_assenze')
         st.subheader("📅 Gestione Ferie e Assenze")
         st.info("Registra qui ferie o permessi dei dipendenti.")
-        dip_nomi = [f"{d['Nome']} {d['Cognome']}" for d in st.session_state.dipendenti]
+        
+        # Accesso sicuro con fallback alle chiavi minuscole o mancanti
+        dip_nomi = [f"{d.get('Nome', d.get('nome', ''))} {d.get('Cognome', d.get('cognome', ''))}".strip() for d in st.session_state.dipendenti]
+        dip_nomi = [n for n in dip_nomi if n] # Rimuove eventuali stringhe vuote
+        
         if dip_nomi:
             d_scelto = st.selectbox("Seleziona Dipendente:", options=dip_nomi)
             data_ass = st.date_input("Data Assenza")
@@ -587,9 +591,10 @@ def dashboard_gestore():
                 st.session_state.registro_assenze.append({"Dipendente": d_scelto, "Data": str(data_ass), "Motivo": motivo})
                 salva_dati_locali()
                 st.success("Assenza registrata!")
-            st.write(pd.DataFrame(st.session_state.registro_assenze))
+            if st.session_state.registro_assenze:
+                st.write(pd.DataFrame(st.session_state.registro_assenze))
         else:
-            st.warning("Inserisci prima almeno un dipendente nella scheda Staff.")
+            st.warning("Inserisci prima almeno un dipendente valido nella scheda Staff.")
 
     with tab5:
         render_tip('tip_generatore')
@@ -598,16 +603,22 @@ def dashboard_gestore():
             righe_turni = []
             giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
             for d in st.session_state.dipendenti:
-                for g in giorni:
-                    righe_turni.append({
-                        "Dipendente": f"{d['Nome']} {d['Cognome']}",
-                        "Reparto": d['Reparto'],
-                        "Giorno": g,
-                        "Turno Assegnato": "Turno Mattina"
-                    })
-            df_risultato = pd.DataFrame(righe_turni)
-            st.session_state.griglia_corrente = df_risultato
-            st.success("Griglia turni generata con successo!")
+                nome_completo = f"{d.get('Nome', d.get('nome', ''))} {d.get('Cognome', d.get('cognome', ''))}".strip()
+                reparto_dip = d.get('Reparto', d.get('reparto', 'Generico'))
+                if nome_completo:
+                    for g in giorni:
+                        righe_turni.append({
+                            "Dipendente": nome_completo,
+                            "Reparto": reparto_dip,
+                            "Giorno": g,
+                            "Turno Assegnato": "Turno Mattina"
+                        })
+            if righe_turni:
+                df_risultato = pd.DataFrame(righe_turni)
+                st.session_state.griglia_corrente = df_risultato
+                st.success("Griglia turni generata con successo!")
+            else:
+                st.warning("Nessun dipendente valido trovato per generare i turni.")
 
         if st.session_state.griglia_corrente is not None:
             st.dataframe(st.session_state.griglia_corrente, use_container_width=True)

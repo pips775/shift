@@ -57,7 +57,7 @@ TRANSLATIONS = {
         "generate_btn": "🤖 GENERAZIONE OTTIMIZZATA TURNI",
         "publish_btn": "🔒 PUBBLICA PIANIFICAZIONE PER IL PERSONALE",
         "tip_struttura": "Configura i reparti e le mansioni operative della tua struttura.",
-        "tip_staff": "Imposta per ogni collaboratore sia le ore massime che i giorni di riposo spettanti.",
+        "tip_staff": "Imposta per ogni collaboratore sia le ore massime che i giorni di riposo spettanti e le mansioni che può svolgere.",
         "tip_fabbisogno": "Imposta quante persone servono per ogni specifico turno nei giorni della settimana.",
         "tip_assenze": "Registra ferie o permessi. L'algoritmo li escluderà dal calcolo turni.",
         "tip_generatore": "L'algoritmo calcola i turni incrociando: Fabbisogno Reparto, Ore Max, Giorni di Riposo Spettanti, Assenze e Giorni di Chiusura.",
@@ -103,7 +103,7 @@ TRANSLATIONS = {
         "generate_btn": "🤖 OPTIMIZED SHIFT GENERATION",
         "publish_btn": "🔒 PUBLISH SCHEDULE TO STAFF",
         "tip_struttura": "Configure departments and operational tasks for your organization.",
-        "tip_staff": "Set both maximum weekly hours and entitlement rest days for each employee.",
+        "tip_staff": "Set maximum weekly hours, entitlement rest days, and roles for each employee.",
         "tip_fabbisogno": "Define how many staff members are required for each specific shift across days of the week.",
         "tip_assenze": "Register leave or time-off. The algorithm will exclude them from shift assignment.",
         "tip_generatore": "The algorithm calculates shifts by cross-referencing: Department Needs, Max Hours, Rest Days, Absences, and Closure Days.",
@@ -149,7 +149,7 @@ TRANSLATIONS = {
         "generate_btn": "🤖 GENERACIÓN OPTIMIZADA TURNOS",
         "publish_btn": "🔒 PUBLICAR PROGRAMACIÓN AL PERSONAL",
         "tip_struttura": "Configura los departamentos y funciones operativas de tu empresa.",
-        "tip_staff": "Establece las horas máximas semanales y los días de descanso para cada empleado.",
+        "tip_staff": "Establece las horas máximas semanales, días de descanso y puestos para cada empleado.",
         "tip_fabbisogno": "Define cuántas personas se necesitan para cada turno específico en los días de la semana.",
         "tip_assenze": "Registra vacaciones o permisos. El algoritmo los excluirá de la programación.",
         "tip_generatore": "El algoritmo calcula los turnos cruzando: Necesidad por Departamento, Horas Máximas, Días de Descanso, Ausencias y Días de Cierre.",
@@ -270,7 +270,6 @@ def elimina_azienda(nome_azienda):
     if "aziende" in st.session_state and nome_azienda in st.session_state.aziende:
         del st.session_state.aziende[nome_azienda]
         
-        # Se l'azienda eliminata era quella attiva, resetta la sessione
         if st.session_state.get("azienda_corrente") == nome_azienda:
             st.session_state.azienda_corrente = None
             st.session_state.lista_gestori = []
@@ -584,7 +583,7 @@ def schermata_landing():
         with col_az_sel:
             az_scelta = st.selectbox("📍 Azienda / Workspace Esistente:", options=elenco_aziende)
         with col_az_del:
-            st.write("") # spaziatore verticale
+            st.write("")
             st.write("")
             if st.button("🗑️ Elimina", help=f"Elimina definitivamente l'azienda '{az_scelta}'"):
                 elimina_azienda(az_scelta)
@@ -672,7 +671,7 @@ def schermata_auth_gestore():
                             },
                             "fabbisogno_per_reparto": {},
                             "registro_assenze": [],
-                            "archivio_turni": {},
+                            "archivio_turni": [],
                             "chat_messaggi": [],
                             "richieste_scambio": [],
                             "wizard_completato": False
@@ -809,20 +808,24 @@ def render_gestore_panel():
                 c1, c2 = st.columns(2)
                 nome_d = c1.text_input("Nome:")
                 cognome_d = c2.text_input("Cognome:")
-                rep_d = c1.selectbox("Reparto:", options=st.session_state.reparti_custom if st.session_state.reparti_custom else ["Generale"])
-                man_d = c2.selectbox("Mansione:", options=st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Operatore"])
+                rep_d = c1.selectbox("Reparto principale:", options=st.session_state.reparti_custom if st.session_state.reparti_custom else ["Generale"])
+                
+                # SELEZIONE MULTIPLA DELLE MANSIONI
+                opt_mansioni = st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Operatore"]
+                man_d = c2.multiselect("Mansioni / Qualifiche abilitate:", options=opt_mansioni, default=[opt_mansioni[0]])
+                
                 ore_max = c1.number_input("Ore Max Settimanali:", min_value=8, max_value=60, value=40)
                 gg_riposo = c2.number_input("Giorni Riposo Spettanti:", min_value=1, max_value=4, value=2)
                 pwd_dip = c1.text_input("Password Dipendente:", type="password")
 
                 if st.form_submit_button("Aggiungi Dipendente"):
-                    if nome_d and cognome_d:
+                    if nome_d and cognome_d and man_d:
                         nuovo_dip = {
                             "id": len(st.session_state.dipendenti) + 1,
                             "nome": nome_d,
                             "cognome": cognome_d,
                             "reparto": rep_d,
-                            "mansione": man_d,
+                            "mansioni": man_d,  # salvato come lista
                             "ore_max": ore_max,
                             "gg_riposo": gg_riposo,
                             "password": pwd_dip
@@ -831,10 +834,23 @@ def render_gestore_panel():
                         salva_dati_locali()
                         st.success(f"Dipendente {nome_d} {cognome_d} registrato!")
                         st.rerun()
+                    else:
+                        st.warning("Seleziona almeno una mansione per il dipendente.")
 
         if st.session_state.dipendenti:
-            df_dip = pd.DataFrame(st.session_state.dipendenti)
-            st.dataframe(df_dip[["id", "nome", "cognome", "reparto", "mansione", "ore_max", "gg_riposo"]], use_container_width=True)
+            dip_display = []
+            for d in st.session_state.dipendenti:
+                m_str = ", ".join(d.get("mansioni", [])) if isinstance(d.get("mansioni"), list) else str(d.get("mansione", ""))
+                dip_display.append({
+                    "id": d.get("id"),
+                    "nome": d.get("nome"),
+                    "cognome": d.get("cognome"),
+                    "reparto": d.get("reparto"),
+                    "mansioni": m_str,
+                    "ore_max": d.get("ore_max"),
+                    "gg_riposo": d.get("gg_riposo")
+                })
+            st.dataframe(pd.DataFrame(dip_display), use_container_width=True)
 
     # TAB 3: Fabbisogno Operativo
     with tab3:
@@ -897,7 +913,14 @@ def render_gestore_panel():
                 matrice_turni = []
 
                 for dip in st.session_state.dipendenti:
-                    row = {"Dipendente": f"{dip['nome']} {dip['cognome']}", "Reparto": dip['reparto']}
+                    m_list = dip.get("mansioni", [])
+                    mansione_lbl = ", ".join(m_list) if isinstance(m_list, list) else str(dip.get("mansione", ""))
+                    
+                    row = {
+                        "Dipendente": f"{dip['nome']} {dip['cognome']}", 
+                        "Reparto": dip['reparto'],
+                        "Mansioni": mansione_lbl
+                    }
                     turni_disp = st.session_state.config_orari_attivita["turni_definiti"]
                     
                     for idx_g, g in enumerate(giorni):

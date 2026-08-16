@@ -203,7 +203,6 @@ def imposta_azienda_attiva(az_selezionata_login):
     st.session_state.reparti_custom = dati_az.get("reparti_custom", ["Cucina", "Sala", "Bar"])
     st.session_state.mansioni_custom = dati_az.get("mansioni_custom", ["Chef", "Cameriere", "Barista"])
     
-    # Dipendenti di default se vuoti
     default_dipendenti = [
         {"Nome": "Mario", "Cognome": "Rossi", "Reparto": "Cucina", "Mansione": "Chef", "Ore Max": 40, "Giorni di Riposo": 2},
         {"Nome": "Luca", "Cognome": "Bianchi", "Reparto": "Sala", "Mansione": "Cameriere", "Ore Max": 36, "Giorni di Riposo": 2},
@@ -255,7 +254,29 @@ def elimina_azienda(nome_azienda):
         salva_dati_locali()
 
 # ==========================================
-# 3. INIZIALIZZAZIONE SESSION STATE
+# 3. FUNZIONE SUPPORTO FABBISOGNO (RIPRISTINATA)
+# ==========================================
+def get_fabbisogno_reparto_df(nome_reparto):
+    if nome_reparto not in st.session_state.fabbisogno_per_reparto:
+        turni = st.session_state.config_orari_attivita["turni_definiti"]
+        if not turni:
+            turni = ["Turno Mattina", "Turno Pomeriggio"]
+        
+        data = {
+            "Turno": turni,
+            "Lunedì": [1] * len(turni),
+            "Martedì": [1] * len(turni),
+            "Mercoledì": [1] * len(turni),
+            "Giovedì": [1] * len(turni),
+            "Venerdì": [1] * len(turni),
+            "Sabato": [1] * len(turni),
+            "Domenica": [0] * len(turni)
+        }
+        st.session_state.fabbisogno_per_reparto[nome_reparto] = pd.DataFrame(data)
+    return st.session_state.fabbisogno_per_reparto[nome_reparto]
+
+# ==========================================
+# 4. INIZIALIZZAZIONE SESSION STATE
 # ==========================================
 def init_session_state():
     if "lingua" not in st.session_state:
@@ -312,7 +333,7 @@ def render_tip(key_tip):
         st.info(f"💡 **Tip ShiftIA:** {t(key_tip)}")
 
 # ==========================================
-# 4. STILI CSS CUSTOM
+# 5. STILI CSS CUSTOM
 # ==========================================
 def inject_custom_css():
     st.markdown(
@@ -352,7 +373,7 @@ def render_footer():
     )
 
 # ==========================================
-# 5. SCHERMATE PRINCIPALI
+# 6. SCHERMATE PRINCIPALI
 # ==========================================
 def schermata_landing():
     top_col1, top_col2 = st.columns([3, 1])
@@ -574,7 +595,6 @@ def dashboard_gestore():
         render_tip('tip_generatore')
         st.subheader("⚡ Motore di Generazione Turni IA")
         if st.button(t('generate_btn'), type="primary", use_container_width=True):
-            # Simulazione generazione turni rapida
             righe_turni = []
             giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
             for d in st.session_state.dipendenti:
@@ -626,7 +646,7 @@ def dashboard_dipendente():
         st.warning("Nessun turno pubblicato al momento dal Gestore.")
 
 # ==========================================
-# 6. ROUTING PRINCIPALE
+# 7. ROUTING PRINCIPALE
 # ==========================================
 init_session_state()
 inject_custom_css()

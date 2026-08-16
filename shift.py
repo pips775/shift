@@ -13,7 +13,7 @@ st.set_page_config(page_title="ShiftIA — Gestione Turni", page_icon="🤖", la
 # 1. HELPER E UTILITIES
 # ==========================================
 def safe_int(val):
-    """Converte in modo sicuro i valori delle celle in interi senza far crasciare il codice."""
+    """Converte in modo sicuro i valori delle celle in interi."""
     if pd.isna(val) or val is None:
         return 0
     try:
@@ -44,14 +44,18 @@ def init_session_state():
     if "show_tips" not in st.session_state:
         st.session_state.show_tips = True
 
-    if "dati_gestore" not in st.session_state:
-        st.session_state.dati_gestore = None
+    # Elenco Gestori (Per tablet condivisi)
+    if "lista_gestori" not in st.session_state:
+        st.session_state.lista_gestori = []
 
     if "ruolo_accesso" not in st.session_state:
         st.session_state.ruolo_accesso = None
 
     if "autenticato_gestore" not in st.session_state:
         st.session_state.autenticato_gestore = False
+
+    if "gestore_corrente" not in st.session_state:
+        st.session_state.gestore_corrente = None
 
     if "dipendente_corrente" not in st.session_state:
         st.session_state.dipendente_corrente = None
@@ -95,7 +99,7 @@ def init_session_state():
     if "richieste_scambio" not in st.session_state:
         st.session_state.richieste_scambio = []
 
-    # State per il Wizard Interattivo
+    # Wizard Interattivo
     if "wizard_attivo" not in st.session_state:
         st.session_state.wizard_attivo = False
     if "wizard_step" not in st.session_state:
@@ -242,38 +246,38 @@ def render_footer():
     )
 
 # ==========================================
-# 3. WIZARD INTERATTIVO (ONBOARDING GUIDATO)
+# 3. WIZARD INTERATTIVO
 # ==========================================
 def render_wizard():
     steps = [
         {
             "titolo": "Passo 1: Struttura Aziendale 📊",
-            "desc": "Inizia definendo i **Reparti** (es. Cucina, Sala, Reparto A) e le **Mansioni** (es. Chef, Cameriere). Configura anche i nomi delle tipologie di turno e i giorni di chiusura.",
+            "desc": "Definisci Reparti (es. Cucina, Sala), Mansioni, nomi dei turni e giorni di chiusura.",
             "target": "Tab 1: Struttura Aziendale"
         },
         {
             "titolo": "Passo 2: Staff & Anagrafica 👥",
-            "desc": "Censisci i tuoi collaboratori assegnando ciascuno a un reparto principale, specificando le mansioni e impostando il **Tetto Max Ore Settimanali Contrattuali**.",
+            "desc": "Censisci i collaboratori con Reparto, Mansioni, Tetto Ore Settimanali e **Giorni di Riposo Spettanti**.",
             "target": "Tab 2: Staff & Anagrafica"
         },
         {
             "titolo": "Passo 3: Fabbisogno Operativo 📈",
-            "desc": "Indica di quante persone hai bisogno per ciascun turno e giorno della settimana per ogni reparto.",
+            "desc": "Imposta quante persone servono per ciascun turno e giorno della settimana.",
             "target": "Tab 3: Fabbisogno Operativo"
         },
         {
             "titolo": "Passo 4: Registro Assenze 📅",
-            "desc": "Inserisci ferie, permessi o malattie. L'algoritmo escluderà automaticamente gli operatori assenti dal calcolo dei turni.",
+            "desc": "Registra ferie, permessi o malattia per escludere gli operatori dal calcolo dei turni.",
             "target": "Tab 4: Calendario & Assenze"
         },
         {
-            "titolo": "Passo 5: CalcoloIA dei Turni ⚡",
-            "desc": "Clicca su **'GENERAZIONE OTTIMIZZATA TURNI'**. L'algoritmo incrocerà le disponibilità, coprirà il fabbisogno e verificherà che nessuno superi il tetto ore massimo.",
+            "titolo": "Passo 5: Calcolo IA dei Turni ⚡",
+            "desc": "Clicca su **'GENERAZIONE OTTIMIZZATA TURNI'**. L'algoritmo bilancerà ore, riposi e fabbisogno.",
             "target": "Tab 5: Generatore IA"
         },
         {
             "titolo": "Passo 6: Pubblicazione & Portale Dipendenti 🚀",
-            "desc": "Revisiona la griglia genera, effettua eventuali modifiche manuali e clicca su **'PUBBLICA'**. I dipendenti potranno ora accedere al proprio portale per consultare i turni e richiedere scambi!",
+            "desc": "Revisiona la griglia e pubblicala. Gli operatori potranno consultarla dal loro portale!",
             "target": "Tab 6 & Portale Operatore"
         }
     ]
@@ -286,7 +290,7 @@ def render_wizard():
             <h3 style="margin:0; color:#a855f7;">🧙‍♂️ Guida Interattiva ShiftIA — Step {curr_step + 1} di {len(steps)}</h3>
             <h4 style="margin:8px 0; color:#38bdf8;">{steps[curr_step]['titolo']}</h4>
             <p style="font-size:15px; color:#e2e8f0;">{steps[curr_step]['desc']}</p>
-            <p style="font-size:12px; color:#94a3b8;">📍 <b>Sezione di riferimento:</b> {steps[curr_step]['target']}</p>
+            <p style="font-size:12px; color:#94a3b8;">📍 <b>Sezione:</b> {steps[curr_step]['target']}</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -297,7 +301,7 @@ def render_wizard():
     col_w1, col_w2, col_w3 = st.columns([1, 1, 1])
     with col_w1:
         if curr_step > 0:
-            if st.button("⬅️ Passo Precedente", use_container_width=True):
+            if st.button("⬅️ Precedente", use_container_width=True):
                 st.session_state.wizard_step -= 1
                 st.rerun()
     with col_w2:
@@ -306,7 +310,7 @@ def render_wizard():
             st.rerun()
     with col_w3:
         if curr_step < len(steps) - 1:
-            if st.button("Passo Successivo ➡️", type="primary", use_container_width=True):
+            if st.button("Successivo ➡️", type="primary", use_container_width=True):
                 st.session_state.wizard_step += 1
                 st.rerun()
         else:
@@ -394,7 +398,7 @@ def schermata_landing():
     render_footer()
 
 # ==========================================
-# 6. AUTHENTICATION GESTORE
+# 6. AUTHENTICATION GESTORE (MULTITABLET / MULTIUTENTE)
 # ==========================================
 def schermata_auth_gestore():
     if st.button(t('back_btn')):
@@ -402,9 +406,9 @@ def schermata_auth_gestore():
         st.session_state.mostra_registrazione_gestore = False
         st.rerun()
     
-    if st.session_state.dati_gestore is None or st.session_state.mostra_registrazione_gestore:
-        st.title("📝 Registrazione Primo Gestore / Azienda")
-        st.info("Nessun account gestore presente. Crea le credenziali della tua attività per iniziare.")
+    if not st.session_state.lista_gestori or st.session_state.mostra_registrazione_gestore:
+        st.title("📝 Registrazione Nuovo Gestore / Administrator")
+        st.info("Crea un account gestore per iniziare ad operare su questo dispositivo.")
         
         with st.form("form_reg_gestore", clear_on_submit=True):
             n_g = st.text_input("Nome")
@@ -414,40 +418,48 @@ def schermata_auth_gestore():
 
             if btn_reg:
                 if n_g.strip() and c_g.strip() and pwd_g.strip():
-                    st.session_state.dati_gestore = {
+                    nuovo_g = {
                         "nome": n_g.strip(),
                         "cognome": c_g.strip(),
                         "password": pwd_g.strip()
                     }
+                    st.session_state.lista_gestori.append(nuovo_g)
+                    st.session_state.gestore_corrente = nuovo_g
                     st.session_state.autenticato_gestore = True
                     st.session_state.sezione_gestore = "Dashboard"
                     st.session_state.mostra_registrazione_gestore = False
-                    st.session_state.wizard_attivo = True  # Avvia Wizard al primo accesso
-                    st.success("✅ Account creato con successo!")
+                    st.session_state.wizard_attivo = True
+                    st.success("✅ Gestore registrato con successo!")
                     st.rerun()
                 else:
                     st.warning("⚠️ Compila tutti i campi obbligatori.")
     else:
         st.title("🔑 Accesso Gestore")
+        st.info("📱 Dispositivo/Tablet Condiviso: Seleziona il tuo profilo dall'elenco.")
+        
+        opzioni_gestori = [f"{g['nome']} {g['cognome']}" for g in st.session_state.lista_gestori]
         
         with st.form("form_login_gestore", clear_on_submit=True):
-            nome_in = st.text_input("Nome")
-            cognome_in = st.text_input("Cognome")
+            gestore_scelto_str = st.selectbox("Seleziona il tuo Profilo Gestore:", options=opzioni_gestori)
             pwd_in = st.text_input("Password", type="password")
+            rimani_collegato = st.checkbox("📌 Rimani collegato su questo dispositivo", value=True)
+            
             btn_log = st.form_submit_button("Entra in ShiftIA 🚀", use_container_width=True)
 
             if btn_log:
-                dati = st.session_state.dati_gestore
-                if (nome_in.strip().lower() == dati["nome"].lower() and 
-                    cognome_in.strip().lower() == dati["cognome"].lower() and 
-                    pwd_in == dati["password"]):
+                idx = opzioni_gestori.index(gestore_scelto_str)
+                target_g = st.session_state.lista_gestori[idx]
+                
+                if pwd_in == target_g["password"]:
+                    st.session_state.gestore_corrente = target_g
                     st.session_state.autenticato_gestore = True
                     st.session_state.sezione_gestore = "Dashboard"
+                    st.success(f"Benvenuto {target_g['nome']}!")
                     st.rerun()
                 else:
-                    st.error("❌ Credenziali errate.")
+                    st.error("❌ Password errata.")
 
-        if st.button("📝 Registra un nuovo Account Gestore", use_container_width=True):
+        if st.button("➕ Registra un altro Gestore su questo dispositivo", use_container_width=True):
             st.session_state.mostra_registrazione_gestore = True
             st.rerun()
 
@@ -463,11 +475,11 @@ def render_area_gestore():
             st.rerun()
     with top3:
         if st.button("🚪 Esci Account", use_container_width=True):
-            st.session_state.ruolo_accesso = None
             st.session_state.autenticato_gestore = False
+            st.session_state.gestore_corrente = None
             st.rerun()
 
-    dati = st.session_state.dati_gestore
+    dati = st.session_state.gestore_corrente
     st.markdown(
         f"""
         <div class="user-welcome-box">
@@ -478,7 +490,6 @@ def render_area_gestore():
         unsafe_allow_html=True
     )
 
-    # Rende il Wizard se attivo
     if st.session_state.wizard_attivo:
         render_wizard()
 
@@ -494,7 +505,7 @@ def render_area_gestore():
     # --- TAB 1: STRUTTURA AZIENDALE ---
     with t1:
         st.subheader("📊 Definizione Reparti, Mansioni e Turni")
-        render_tip("Configura i moduli base della tua attività. Crea reparti e mansioni della tua struttura.")
+        render_tip("Configura i reparti e le mansioni operative della tua struttura.")
 
         col_r, col_m = st.columns(2)
         with col_r:
@@ -557,11 +568,11 @@ def render_area_gestore():
 
     # --- TAB 2: STAFF & ANAGRAFICA ---
     with t2:
-        st.subheader("👥 Anagrafica Personale")
-        render_tip("Inserisci i collaboratori assegnando loro un reparto e le ore settimanali contrattuali.")
+        st.subheader("👥 Anagrafica Personale & Regole Contrattuali")
+        render_tip("Imposta per ogni collaboratore sia le ore massime che i **giorni di riposo spettanti**.")
 
         if not st.session_state.reparti_custom:
-            st.warning("⚠️ Prima di aggiungere personale, registra almeno un Reparto nella scheda 'Struttura Aziendale'.")
+            st.warning("⚠️ Registra almeno un Reparto nella scheda 'Struttura Aziendale' prima di aggiungere personale.")
 
         with st.expander("➕ Inserisci Nuovo Collaboratore", expanded=True):
             with st.form("form_add_dip", clear_on_submit=True):
@@ -573,20 +584,26 @@ def render_area_gestore():
                 
                 rep_sel = st.selectbox(
                     "Reparto Principale di Appartenenza", 
-                    st.session_state.reparti_custom if st.session_state.reparti_custom else ["Aggiungi prima un reparto"]
+                    st.session_state.reparti_custom if st.session_state.reparti_custom else ["Nessun reparto"]
                 )
                 m_sel = st.multiselect(
                     "Mansioni Abilitate / Competenze", 
-                    st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Nessuna Mansione Creata"]
+                    st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Nessuna mansione"]
                 )
-                ore = st.number_input("Tetto Max Ore Settimanali Contrattuali", value=40, step=1)
+                
+                col_o1, col_o2 = st.columns(2)
+                with col_o1:
+                    ore = st.number_input("Max Ore Settimanali Contrattuali", value=40, step=1)
+                with col_o2:
+                    riposi = st.number_input("Giorni di Riposo Spettanti (Settimanali)", value=2, min_value=0, max_value=6, step=1)
 
                 if st.form_submit_button("💾 Registra Collaboratore", use_container_width=True):
                     if n.strip() and c.strip() and st.session_state.reparti_custom:
                         st.session_state.dipendenti.append({
                             "ID": len(st.session_state.dipendenti) + 1,
                             "Nome": n.strip(), "Cognome": c.strip(),
-                            "Reparto": rep_sel, "Mansioni": m_sel, "Max_Ore": ore
+                            "Reparto": rep_sel, "Mansioni": m_sel, 
+                            "Max_Ore": ore, "Giorni_Riposo": riposi
                         })
                         st.success(f"✅ Registrato: {n} {c}")
                         st.rerun()
@@ -597,22 +614,19 @@ def render_area_gestore():
         if st.session_state.dipendenti:
             st.dataframe(pd.DataFrame(st.session_state.dipendenti), use_container_width=True)
 
-            # --- SEZIONE ELIMINAZIONE COLLABORATORE ---
             st.markdown("---")
-            st.markdown("##### 🗑️ Rimuovi / Elimina Collaboratore dall'Anagrafica")
+            st.markdown("##### 🗑️ Rimuovi Collaboratore")
             col_del1, col_del2 = st.columns([3, 1])
-            
             with col_del1:
                 opzioni_dip = [f"ID #{d['ID']}: {d['Nome']} {d['Cognome']} ({d['Reparto']})" for d in st.session_state.dipendenti]
                 dip_scelto_del = st.selectbox("Seleziona collaboratore da eliminare:", options=opzioni_dip, key="select_del_dip")
-            
             with col_del2:
                 st.write("")
                 st.write("")
                 if st.button("🗑️ Rimuovi", type="primary", use_container_width=True, key="btn_del_dip"):
                     idx_del = opzioni_dip.index(dip_scelto_del)
                     rimosso = st.session_state.dipendenti.pop(idx_del)
-                    st.success(f"✅ **{rimosso['Nome']} {rimosso['Cognome']}** eliminato con successo!")
+                    st.success(f"✅ **{rimosso['Nome']} {rimosso['Cognome']}** eliminato!")
                     st.rerun()
         else:
             st.info("Nessun membro del personale inserito.")
@@ -646,7 +660,7 @@ def render_area_gestore():
     # --- TAB 4: CALENDARIO & ASSENZE ---
     with t4:
         st.subheader("📅 Registro Assenze & Disponibilità")
-        render_tip("Registra ferie, permessi o malattia. L'algoritmo escluderà gli operatori assenti dal calcolo turni.")
+        render_tip("Registra ferie o permessi. L'algoritmo li escluderà dal calcolo turni.")
 
         oggi = datetime.now()
         cal = calendar.monthcalendar(oggi.year, oggi.month)
@@ -694,45 +708,45 @@ def render_area_gestore():
         else:
             st.info("Nessun dipendente a cui assegnare un'assenza.")
 
-    # --- TAB 5: GENERATORE IA ---
+    # --- TAB 5: GENERATORE IA POTENZIATO ---
     with t5:
-        st.subheader("⚡ Algoritmo Generatore Turni")
-        render_tip("L'algoritmo incrocia Reparti, Fabbisogno del personale, Assenze e controlla il **Tetto Max Ore Contrattuali**.")
+        st.subheader("⚡ Algoritmo Generatore Turni Intelligente")
+        render_tip("L'algoritmo calcola i turni incrociando: **Fabbisogno Reparto, Ore Max, Giorni di Riposo Spettanti, Assenze e Giorni di Chiusura**.")
 
-        data_riferimento = st.date_input("Seleziona data di inizio settimana di programmazione:", datetime.now() + timedelta(days=7))
+        data_riferimento = st.date_input("Seleziona data di inizio settimana:", datetime.now() + timedelta(days=7))
         lunedi_scelto = data_riferimento - timedelta(days=data_riferimento.weekday())
 
         if st.button("🤖 GENERAZIONE OTTIMIZZATA TURNI", type="primary", use_container_width=True):
             if not st.session_state.dipendenti:
-                st.warning("⚠️ Nessun collaboratore censito. Inserisci prima lo staff nel tab 'Staff & Anagrafica'.")
+                st.warning("⚠️ Nessun collaboratore censito nello Staff.")
             elif not st.session_state.reparti_custom:
-                st.warning("⚠️ Nessun reparto configurato. Registra i reparti nel tab 'Struttura Aziendale'.")
+                st.warning("⚠️ Nessun reparto configurato.")
             else:
                 giorni_settimana = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
                 chiusure = st.session_state.config_orari_attivita["giorni_chiusura"]
                 date_settimana = [lunedi_scelto + timedelta(days=i) for i in range(7)]
 
                 ore_accumulate = {f"{d['Nome']} {d['Cognome']}": 0 for d in st.session_state.dipendenti}
-                
+                riposi_effettuati = {f"{d['Nome']} {d['Cognome']}": 0 for d in st.session_state.dipendenti}
+
                 matrice_turni = {
                     f"{d['Nome']} {d['Cognome']}": {
                         "Reparto": d.get("Reparto", "Generale"),
-                        "Mansioni": ", ".join(d["Mansioni"]) if isinstance(d["Mansioni"], list) else str(d["Mansioni"]),
-                        "Max_Ore": d.get("Max_Ore", 40)
+                        "Max_Ore": d.get("Max_Ore", 40),
+                        "Giorni_Riposo": d.get("Giorni_Riposo", 2)
                     } for d in st.session_state.dipendenti
                 }
 
+                # Step 1: Pre-compilazione Chiusure, Assenze e Inizializzazione
                 for idx, g in enumerate(giorni_settimana):
                     data_curr = date_settimana[idx]
-
-                    if g in chiusure:
-                        for dip in st.session_state.dipendenti:
-                            nome_c = f"{dip['Nome']} {dip['Cognome']}"
-                            matrice_turni[nome_c][g] = "CHIUSURA"
-                        continue
-
                     for dip in st.session_state.dipendenti:
                         nome_c = f"{dip['Nome']} {dip['Cognome']}"
+
+                        if g in chiusure:
+                            matrice_turni[nome_c][g] = "CHIUSURA"
+                            continue
+
                         assenza_trovata = None
                         for ass in st.session_state.registro_assenze:
                             if ass["Dipendente"] == nome_c:
@@ -741,11 +755,16 @@ def render_area_gestore():
                                 if d_i <= data_curr <= d_f:
                                     assenza_trovata = ass["Tipo"]
                                     break
-                        
+
                         if assenza_trovata:
                             matrice_turni[nome_c][g] = f"🚫 {assenza_trovata}"
                         else:
-                            matrice_turni[nome_c][g] = "RIPOSO"
+                            matrice_turni[nome_c][g] = "LIBERO"
+
+                # Step 2: Assegnazione Turni per Copertura Fabbisogno
+                for idx, g in enumerate(giorni_settimana):
+                    if g in chiusure:
+                        continue
 
                     for rep_nome in st.session_state.reparti_custom:
                         df_fab = get_fabbisogno_reparto_df(rep_nome)
@@ -753,16 +772,16 @@ def render_area_gestore():
                         for _, row_fab in df_fab.iterrows():
                             nome_turno = str(row_fab["Turno"])
                             persone_richieste = safe_int(row_fab.get(g, 0))
-                            
                             ore_turno = 8
-
                             persone_assegnate = 0
 
+                            # Candidati del reparto disponibile
                             dip_candidati = [
                                 d for d in st.session_state.dipendenti 
                                 if str(d.get("Reparto")).strip().lower() == str(rep_nome).strip().lower()
                             ]
 
+                            # Ordina per chi ha lavorato meno ore per bilanciare il carico
                             dip_candidati = sorted(
                                 dip_candidati, 
                                 key=lambda x: ore_accumulate[f"{x['Nome']} {x['Cognome']}"]
@@ -773,25 +792,40 @@ def render_area_gestore():
                                 max_o = d.get("Max_Ore", 40)
                                 ore_attuali = ore_accumulate[nome_c]
 
-                                if matrice_turni[nome_c][g] == "RIPOSO" and (ore_attuali + ore_turno <= max_o):
+                                if matrice_turni[nome_c][g] == "LIBERO" and (ore_attuali + ore_turno <= max_o):
                                     if persone_assegnate < persone_richieste:
                                         matrice_turni[nome_c][g] = nome_turno
                                         ore_accumulate[nome_c] += ore_turno
                                         persone_assegnate += 1
 
+                # Step 3: Formalizzazione Riposi Spettanti
+                for dip in st.session_state.dipendenti:
+                    nome_c = f"{dip['Nome']} {dip['Cognome']}"
+                    riposi_dovuti = dip.get("Giorni_Riposo", 2)
+                    
+                    for g in giorni_settimana:
+                        if matrice_turni[nome_c][g] == "LIBERO":
+                            if riposi_effettuati[nome_c] < riposi_dovuti:
+                                matrice_turni[nome_c][g] = "RIPOSO"
+                                riposi_effettuati[nome_c] += 1
+                            else:
+                                matrice_turni[nome_c][g] = "DISPONIBILE"
+
+                # Costruzione DataFrame finale
                 lista_righe = []
                 for nome_c, val in matrice_turni.items():
                     riga = {
                         "Operatore": nome_c, 
                         "Reparto": val["Reparto"], 
-                        "Totale Ore": f"{ore_accumulate[nome_c]}h / {val['Max_Ore']}h"
+                        "Totale Ore": f"{ore_accumulate[nome_c]}h / {val['Max_Ore']}h",
+                        "Riposi": f"{riposi_effettuati[nome_c]} / {val['Giorni_Riposo']}"
                     }
                     for g in giorni_settimana:
                         riga[g] = val.get(g, "RIPOSO")
                     lista_righe.append(riga)
 
                 st.session_state.griglia_corrente = pd.DataFrame(lista_righe)
-                st.success("✅ Turnazione settimanale calcolata con successo!")
+                st.success("✅ Generazione Turni completata con successo!")
 
         if st.session_state.griglia_corrente is not None:
             st.markdown("#### ✏️ Modifica e Pubblicazione della Griglia")
@@ -803,7 +837,7 @@ def render_area_gestore():
                     "settimana": lunedi_scelto.strftime('%d/%m/%Y'),
                     "dataframe": df_edit
                 }
-                st.success("✅ Pianificazione pubblicata e resa visibile al personale!")
+                st.success("✅ Pianificazione pubblicata e visibile agli operatori!")
 
     # --- TAB 6: ARCHIVIO & IMPOSTAZIONI ---
     with t6:
@@ -835,7 +869,7 @@ def render_area_gestore():
 def render_area_dipendente():
     top1, top2 = st.columns([4, 1])
     with top2:
-        if st.button("🚪 Esci", use_container_width=True):
+        if st.button("🚪 Esci Profilo", use_container_width=True):
             st.session_state.ruolo_accesso = None
             st.session_state.dipendente_corrente = None
             st.rerun()
@@ -843,23 +877,27 @@ def render_area_dipendente():
     if st.session_state.dipendente_corrente is None:
         st.title("👤 Portale Operatore")
         if not st.session_state.dipendenti:
-            st.warning("⚠️ Nessun operatore censito nel sistema. Richiedi al gestore di registrare il tuo profilo.")
+            st.warning("⚠️ Nessun operatore censito nel sistema. Richiedi al gestore di inserirti in anagrafica.")
             return
 
         lista_dip_nomi = [f"{d['Nome']} {d['Cognome']} — [{d.get('Reparto', 'Generale')}]" for d in st.session_state.dipendenti]
-        scelta = st.selectbox("Seleziona il tuo Profilo:", options=lista_dip_nomi)
+        
+        with st.form("form_login_dip", clear_on_submit=False):
+            scelta = st.selectbox("Seleziona il tuo Profilo:", options=lista_dip_nomi)
+            rimani_collegato_dip = st.checkbox("📌 Rimani collegato", value=True)
+            btn_ent = st.form_submit_button("🚀 Entra nel Portale", use_container_width=True)
 
-        if st.button("🚀 Entra nel Portale", type="primary", use_container_width=True):
-            idx_scelto = lista_dip_nomi.index(scelta)
-            st.session_state.dipendente_corrente = st.session_state.dipendenti[idx_scelto]
-            st.rerun()
+            if btn_ent:
+                idx_scelto = lista_dip_nomi.index(scelta)
+                st.session_state.dipendente_corrente = st.session_state.dipendenti[idx_scelto]
+                st.rerun()
     else:
         dip = st.session_state.dipendente_corrente
         st.markdown(
             f"""
             <div class="user-welcome-box">
-                <h3 style="margin:0;">Benvenuto/a, {dip['Nome']} 👋</h3>
-                <p style="margin:2px 0 0 0; color:#cbd5e1;">Reparto / Area: <b>{dip.get('Reparto')}</b></p>
+                <h3 style="margin:0;">Benvenuto/a, {dip['Nome']} {dip['Cognome']} 👋</h3>
+                <p style="margin:2px 0 0 0; color:#cbd5e1;">Reparto: <b>{dip.get('Reparto')}</b> | Max Ore: <b>{dip.get('Max_Ore')}h</b> | Riposi Spettanti: <b>{dip.get('Giorni_Riposo')} gg</b></p>
             </div>
             """,
             unsafe_allow_html=True
@@ -870,7 +908,7 @@ def render_area_dipendente():
         with tab_d1:
             st.subheader("📅 Turnazione Pubblicata")
             if not st.session_state.archivio_turni:
-                st.info("ℹ️ Nessuna tabella turni attualmente pubblicata.")
+                st.info("ℹ️ Nessuna tabella turni pubblicata.")
             else:
                 for k, dati_t in st.session_state.archivio_turni.items():
                     st.markdown(f"**Programmazione dal {dati_t['settimana']}**")
@@ -880,13 +918,13 @@ def render_area_dipendente():
             st.subheader("🔄 Modulo Richiesta Scambio Turno")
             colleghi = [f"{d['Nome']} {d['Cognome']}" for d in st.session_state.dipendenti if d['ID'] != dip['ID']]
             if not colleghi:
-                st.warning("Nessun collega disponibile per proporre uno scambio.")
+                st.warning("Nessun collega disponibile.")
             else:
                 with st.form("form_scambio", clear_on_submit=True):
                     sostituto = st.selectbox("Seleziona Collega Proposto:", colleghi)
                     giorno = st.selectbox("Giorno del Turno:", ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"])
                     motivo = st.text_area("Note / Motivazione:")
-                    if st.form_submit_button("Invia Richiesta al Gestore 🚀", use_container_width=True):
+                    if st.form_submit_button("Invia Richiesta 🚀", use_container_width=True):
                         st.session_state.richieste_scambio.append({
                             "Richiedente": f"{dip['Nome']} {dip['Cognome']}",
                             "Giorno_Richiedente": giorno,
@@ -894,7 +932,7 @@ def render_area_dipendente():
                             "Motivazione": motivo,
                             "Stato": "In Attesa"
                         })
-                        st.success("✅ Richiesta di scambio inviata con successo!")
+                        st.success("✅ Richiesta inviata al gestore!")
                         st.rerun()
 
         with tab_d3:
@@ -931,7 +969,7 @@ def main():
     if st.session_state.ruolo_accesso is None:
         schermata_landing()
     elif st.session_state.ruolo_accesso == "Gestore":
-        if not st.session_state.autenticato_gestore:
+        if not st.session_state.autenticato_gestore or st.session_state.gestore_corrente is None:
             schermata_auth_gestore()
         else:
             render_area_gestore()

@@ -797,7 +797,7 @@ def render_gestore_panel():
                     salva_dati_locali()
                     st.rerun()
 
-   # TAB 2: Staff & Anagrafica
+  # TAB 2: Staff & Anagrafica
     with tab2:
         st.subheader("👥 Anagrafica & Gestione Staff Interattiva")
         render_tip("tip_staff")
@@ -837,48 +837,57 @@ def render_gestore_panel():
                     else:
                         st.warning("⚠️ Compila tutti i campi e seleziona almeno una mansione.")
 
-        # 2. TABELLA EDITABILE DIRETTAMENTE IN-PLACE
+        # 2. TABELLA EDITABILE CON MANSIONI A CASELLA DI SPUNTA MULTIPLA
         st.markdown("### ✏️ Tabella Collaboratori Registrati")
-        st.caption("Puoi modificare la mansione principale, il reparto, le ore e i dati direttamente dalle celle. Spunta 'Elimina' per rimuovere un dipendente.")
+        st.caption("Metti o togli la spunta dalle colonne delle mansioni per assegnarne più di una a ciascun collaboratore. Clicca su 'Salva' per applicare.")
 
         if st.session_state.dipendenti:
+            lista_reparti_opt = st.session_state.reparti_custom if st.session_state.reparti_custom else ["Generale"]
+            lista_mansioni_opt = st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Operatore"]
+
+            # Estraiamo ogni mansione come colonna True/False (Checkbox)
             data_list = []
             for d in st.session_state.dipendenti:
                 m_list = d.get("mansioni", [])
-                if isinstance(m_list, list) and len(m_list) > 0:
-                    mansione_principale = str(m_list[0])
-                else:
-                    mansione_principale = str(d.get("mansione", ""))
-                
-                data_list.append({
+                if not isinstance(m_list, list):
+                    m_list = [str(d.get("mansione", ""))] if d.get("mansione") else []
+
+                row_dict = {
                     "ID": d.get("id"),
                     "Nome": d.get("nome", ""),
                     "Cognome": d.get("cognome", ""),
                     "Reparto": d.get("reparto", ""),
-                    "Mansione": mansione_principale,
-                    "Ore Max": int(d.get("ore_max", 40)),
-                    "GG Riposo": int(d.get("gg_riposo", 2)),
-                    "Password": d.get("password", ""),
-                    "Elimina": False
-                })
+                }
+
+                # Creiamo una colonna spuntabile per ogni mansione esistente
+                for man in lista_mansioni_opt:
+                    row_dict[f"🛠️ {man}"] = man in m_list
+
+                row_dict["Ore Max"] = int(d.get("ore_max", 40))
+                row_dict["GG Riposo"] = int(d.get("gg_riposo", 2))
+                row_dict["Password"] = d.get("password", "")
+                row_dict["Elimina"] = False
+
+                data_list.append(row_dict)
 
             df_staff = pd.DataFrame(data_list)
 
-            lista_reparti_opt = st.session_state.reparti_custom if st.session_state.reparti_custom else ["Generale"]
-            lista_mansioni_opt = st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Operatore"]
-
-            # Utilizziamo SelectboxColumn per la mansione: è nativamente supportato ed evita errori di runtime
+            # Configurazione colonne
             column_config = {
                 "ID": st.column_config.NumberColumn("ID", disabled=True),
                 "Nome": st.column_config.TextColumn("Nome", required=True),
                 "Cognome": st.column_config.TextColumn("Cognome", required=True),
                 "Reparto": st.column_config.SelectboxColumn("Reparto", options=lista_reparti_opt, required=True),
-                "Mansione": st.column_config.SelectboxColumn("Mansione", options=lista_mansioni_opt, required=True),
-                "Ore Max": st.column_config.NumberColumn("Ore Max", min_value=8, max_value=60, step=1),
-                "GG Riposo": st.column_config.NumberColumn("GG Riposo", min_value=1, max_value=4, step=1),
-                "Password": st.column_config.TextColumn("Password"),
-                "Elimina": st.column_config.CheckboxColumn("🗑️ Elimina?", default=False)
             }
+
+            # Aggiungiamo le colonne Checkbox per le mansioni
+            for man in lista_mansioni_opt:
+                column_config[f"🛠️ {man}"] = st.column_config.CheckboxColumn(man, default=False)
+
+            column_config["Ore Max"] = st.column_config.NumberColumn("Ore Max", min_value=8, max_value=60, step=1)
+            column_config["GG Riposo"] = st.column_config.NumberColumn("GG Riposo", min_value=1, max_value=4, step=1)
+            column_config["Password"] = st.column_config.TextColumn("Password")
+            column_config["Elimina"] = st.column_config.CheckboxColumn("🗑️ Elimina?", default=False)
 
             edited_df = st.data_editor(
                 df_staff,
@@ -892,14 +901,19 @@ def render_gestore_panel():
                 nuova_lista_dipendenti = []
                 for _, row in edited_df.iterrows():
                     if not row["Elimina"]:
-                        m_val = [str(row["Mansione"])]
+                        # Ricostruiamo la lista di tutte le mansioni che hanno la spunta attiva
+                        mansioni_selezionate = [man for man in lista_mansioni_opt if row.get(f"🛠️ {man}", False)]
+                        
+                        # Se l'utente non ne ha spuntata nessuna, lasciamo di default la prima
+                        if not mansioni_selezionate and lista_mansioni_opt:
+                            mansioni_selezionate = [lista_mansioni_opt[0]]
 
                         nuova_lista_dipendenti.append({
                             "id": int(row["ID"]),
                             "nome": str(row["Nome"]),
                             "cognome": str(row["Cognome"]),
                             "reparto": str(row["Reparto"]),
-                            "mansioni": m_val,
+                            "mansioni": mansioni_selezionate,
                             "ore_max": int(row["Ore Max"]),
                             "gg_riposo": int(row["GG Riposo"]),
                             "password": str(row["Password"])
@@ -907,7 +921,7 @@ def render_gestore_panel():
                 
                 st.session_state.dipendenti = nuova_lista_dipendenti
                 salva_dati_locali()
-                st.success("✅ Tabella Staff aggiornata con successo!")
+                st.success("✅ Tabella Staff e mansioni multiple aggiornate con successo!")
                 st.rerun()
         else:
             st.info("ℹ️ Nessun dipendente registrato. Registra il primo dipendente dal pannello in alto.")

@@ -797,7 +797,7 @@ def render_gestore_panel():
                     salva_dati_locali()
                     st.rerun()
 
-    # TAB 2: Staff & Anagrafica
+   # TAB 2: Staff & Anagrafica
     with tab2:
         st.subheader("👥 Anagrafica & Gestione Staff Interattiva")
         render_tip("tip_staff")
@@ -837,24 +837,25 @@ def render_gestore_panel():
                     else:
                         st.warning("⚠️ Compila tutti i campi e seleziona almeno una mansione.")
 
-        # 2. TABELLA EDITABILE DIRETTAMENTE IN-PLACE PER EDITING ED ELIMINAZIONE
+        # 2. TABELLA EDITABILE DIRETTAMENTE IN-PLACE
         st.markdown("### ✏️ Tabella Collaboratori Registrati")
-        st.caption("Puoi modificare le mansioni, il reparto, le ore e i nomi direttamente cliccando sulle celle. Spunta 'Elimina' per rimuovere un dipendente.")
+        st.caption("Puoi modificare la mansione principale, il reparto, le ore e i dati direttamente dalle celle. Spunta 'Elimina' per rimuovere un dipendente.")
 
         if st.session_state.dipendenti:
-            # Prepariamo il DataFrame per la visualizzazione nella tabella interattiva
             data_list = []
             for d in st.session_state.dipendenti:
                 m_list = d.get("mansioni", [])
-                if not isinstance(m_list, list):
-                    m_list = [str(d.get("mansione", ""))] if d.get("mansione") else []
+                if isinstance(m_list, list) and len(m_list) > 0:
+                    mansione_principale = str(m_list[0])
+                else:
+                    mansione_principale = str(d.get("mansione", ""))
                 
                 data_list.append({
                     "ID": d.get("id"),
                     "Nome": d.get("nome", ""),
                     "Cognome": d.get("cognome", ""),
                     "Reparto": d.get("reparto", ""),
-                    "Mansioni Assegnate": m_list,
+                    "Mansione": mansione_principale,
                     "Ore Max": int(d.get("ore_max", 40)),
                     "GG Riposo": int(d.get("gg_riposo", 2)),
                     "Password": d.get("password", ""),
@@ -863,43 +864,35 @@ def render_gestore_panel():
 
             df_staff = pd.DataFrame(data_list)
 
-            # Opzioni disponibili per i menu a tendina
             lista_reparti_opt = st.session_state.reparti_custom if st.session_state.reparti_custom else ["Generale"]
             lista_mansioni_opt = st.session_state.mansioni_custom if st.session_state.mansioni_custom else ["Operatore"]
 
-            # Configuratore di colonne avanzato
+            # Utilizziamo SelectboxColumn per la mansione: è nativamente supportato ed evita errori di runtime
+            column_config = {
+                "ID": st.column_config.NumberColumn("ID", disabled=True),
+                "Nome": st.column_config.TextColumn("Nome", required=True),
+                "Cognome": st.column_config.TextColumn("Cognome", required=True),
+                "Reparto": st.column_config.SelectboxColumn("Reparto", options=lista_reparti_opt, required=True),
+                "Mansione": st.column_config.SelectboxColumn("Mansione", options=lista_mansioni_opt, required=True),
+                "Ore Max": st.column_config.NumberColumn("Ore Max", min_value=8, max_value=60, step=1),
+                "GG Riposo": st.column_config.NumberColumn("GG Riposo", min_value=1, max_value=4, step=1),
+                "Password": st.column_config.TextColumn("Password"),
+                "Elimina": st.column_config.CheckboxColumn("🗑️ Elimina?", default=False)
+            }
+
             edited_df = st.data_editor(
                 df_staff,
                 key="editor_staff_table",
                 use_container_width=True,
                 num_rows="fixed",
-                column_config={
-                    "ID": st.column_config.NumberColumn("ID", disabled=True),
-                    "Nome": st.column_config.TextColumn("Nome", required=True),
-                    "Cognome": st.column_config.TextColumn("Cognome", required=True),
-                    "Reparto": st.column_config.SelectboxColumn("Reparto", options=lista_reparti_opt, required=True),
-                    "Mansioni Assegnate": st.column_config.ListColumn(
-                        "Mansioni (Multi-Selezione)",
-                        help="Clicca sulla cella per aggiungere o rimuovere più mansioni",
-                        options=lista_mansioni_opt
-                    ),
-                    "Ore Max": st.column_config.NumberColumn("Ore Max", min_value=8, max_value=60, step=1),
-                    "GG Riposo": st.column_config.NumberColumn("GG Riposo", min_value=1, max_value=4, step=1),
-                    "Password": st.column_config.TextColumn("Password"),
-                    "Elimina": st.column_config.CheckboxColumn("🗑️ Elimina?", default=False)
-                }
+                column_config=column_config
             )
 
             if st.button("💾 Salva Modifiche Tabella Staff", type="primary", use_container_width=True):
                 nuova_lista_dipendenti = []
                 for _, row in edited_df.iterrows():
                     if not row["Elimina"]:
-                        # Convertiamo le mansioni per la corretta conservazione nel json
-                        m_val = row["Mansioni Assegnate"]
-                        if isinstance(m_val, np.ndarray):
-                            m_val = m_val.tolist()
-                        elif not isinstance(m_val, list):
-                            m_val = [str(m_val)]
+                        m_val = [str(row["Mansione"])]
 
                         nuova_lista_dipendenti.append({
                             "id": int(row["ID"]),
@@ -914,11 +907,10 @@ def render_gestore_panel():
                 
                 st.session_state.dipendenti = nuova_lista_dipendenti
                 salva_dati_locali()
-                st.success("✅ Tabella Staff e mansioni aggiornate con successo!")
+                st.success("✅ Tabella Staff aggiornata con successo!")
                 st.rerun()
         else:
             st.info("ℹ️ Nessun dipendente registrato. Registra il primo dipendente dal pannello in alto.")
-
     # TAB 3: Fabbisogno Operativo
     with tab3:
         st.subheader("📈 Definizione Fabbisogno Operativo")

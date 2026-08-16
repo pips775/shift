@@ -55,6 +55,13 @@ TRANSLATIONS = {
         "reg_btn": "Crea Account Gestore 🚀",
         "generate_btn": "🤖 GENERAZIONE OTTIMIZZATA TURNI",
         "publish_btn": "🔒 PUBBLICA PIANIFICAZIONE PER IL PERSONALE",
+        # TIPS
+        "tip_struttura": "Configura i reparti e le mansioni operative della tua struttura.",
+        "tip_staff": "Imposta per ogni collaboratore sia le ore massime che i giorni di riposo spettanti.",
+        "tip_fabbisogno": "Imposta quante persone servono per ogni specifico turno nei giorni della settimana.",
+        "tip_assenze": "Registra ferie o permessi. L'algoritmo li escluderà dal calcolo turni.",
+        "tip_generatore": "L'algoritmo calcola i turni incrociando: Fabbisogno Reparto, Ore Max, Giorni di Riposo Spettanti, Assenze e Giorni di Chiusura.",
+        "tip_gestori_mgmt": "Qui puoi aggiornare le credenziali o eliminare gli account gestori esistenti prima di accedere."
     },
     "EN": {
         "tagline": "Shift planning for any business sector.",
@@ -94,6 +101,13 @@ TRANSLATIONS = {
         "reg_btn": "Create Manager Account 🚀",
         "generate_btn": "🤖 OPTIMIZED SHIFT GENERATION",
         "publish_btn": "🔒 PUBLISH SCHEDULE TO STAFF",
+        # TIPS
+        "tip_struttura": "Configure departments and operational tasks for your organization.",
+        "tip_staff": "Set both maximum weekly hours and entitlement rest days for each employee.",
+        "tip_fabbisogno": "Define how many staff members are required for each specific shift across days of the week.",
+        "tip_assenze": "Register leave or time-off. The algorithm will exclude them from shift assignment.",
+        "tip_generatore": "The algorithm calculates shifts by cross-referencing: Department Needs, Max Hours, Rest Days, Absences, and Closure Days.",
+        "tip_gestori_mgmt": "Here you can update credentials or delete existing manager accounts before logging in."
     },
     "ES": {
         "tagline": "Planificación de turnos para cualquier sector empresarial.",
@@ -133,6 +147,13 @@ TRANSLATIONS = {
         "reg_btn": "Crear Cuenta Gestor 🚀",
         "generate_btn": "🤖 GENERACIÓN OPTIMIZADA TURNOS",
         "publish_btn": "🔒 PUBLICAR PROGRAMACIÓN AL PERSONAL",
+        # TIPS
+        "tip_struttura": "Configura los departamentos y funciones operativas de tu empresa.",
+        "tip_staff": "Establece las horas máximas semanales y los días de descanso para cada empleado.",
+        "tip_fabbisogno": "Define cuántas personas se necesitan para cada turno específico en los días de la semana.",
+        "tip_assenze": "Registra vacaciones o permisos. El algoritmo los excluirá de la programación.",
+        "tip_generatore": "El algoritmo calcula los turnos cruzando: Necesidad por Departamento, Horas Máximas, Días de Descanso, Ausencias y Días de Cierre.",
+        "tip_gestori_mgmt": "Aquí puedes actualizar credenciales o eliminar cuentas de gestores existentes antes de iniciar sesión."
     }
 }
 
@@ -278,9 +299,9 @@ def init_session_state():
         carica_dati_locali()
         st.session_state.dati_caricati_da_file = True
 
-def render_tip(testo):
+def render_tip(key_tip):
     if st.session_state.show_tips:
-        st.info(f"💡 **Tip ShiftIA:** {testo}")
+        st.info(f"💡 **Tip ShiftIA:** {t(key_tip)}")
 
 def get_fabbisogno_reparto_df(nome_reparto):
     if nome_reparto not in st.session_state.fabbisogno_per_reparto:
@@ -504,7 +525,7 @@ def schermata_auth_gestore():
 
     col_left, col_right = st.columns(2)
 
-    # SECONDA COLONNA: REGISTRAZIONE NUOVO GESTORE
+    # REGISTRAZIONE NUOVO GESTORE
     with col_right:
         st.subheader(t("reg_gestore_title"))
         with st.form("form_reg_gestore", clear_on_submit=True):
@@ -529,7 +550,7 @@ def schermata_auth_gestore():
                 else:
                     st.warning("⚠️ Compila tutti i campi obbligatori.")
 
-    # PRIMA COLONNA: LOGIN SE PRESENTI GESTORI, ALTRIMENTI AVVISO
+    # LOGIN GESTORE
     with col_left:
         st.subheader(t("login_gestore_title"))
         if not st.session_state.lista_gestori:
@@ -553,11 +574,11 @@ def schermata_auth_gestore():
                     else:
                         st.error("❌ Password errata.")
 
-    # SEZIONE INFERIORE: MODIFICA / ELIMINAZIONE ACCOUNT GESTORI
+    # GESTIONE ACCOUNT GESTORI
     if st.session_state.lista_gestori:
         st.markdown("---")
         st.subheader(t("gestori_mgmt_title"))
-        st.info("💡 Qui puoi aggiornare le credenziali o eliminare gli account gestori esistenti prima di accedere.")
+        render_tip("tip_gestori_mgmt")
 
         opzioni_g = [f"{g['nome']} {g['cognome']}" for g in st.session_state.lista_gestori]
         g_scelto_str = st.selectbox("Seleziona Gestore da Modificare o Eliminare:", options=opzioni_g, key="select_gestore_mgmt_auth")
@@ -631,7 +652,7 @@ def render_area_gestore():
     # --- TAB 1: STRUTTURA AZIENDALE ---
     with t1:
         st.subheader("📊 Definizione Reparti, Mansioni e Turni")
-        render_tip("Configura i reparti e le mansioni operative della tua struttura.")
+        render_tip("tip_struttura")
 
         col_r, col_m = st.columns(2)
         with col_r:
@@ -699,7 +720,7 @@ def render_area_gestore():
     # --- TAB 2: STAFF & ANAGRAFICA ---
     with t2:
         st.subheader("👥 Anagrafica Personale & Regole Contrattuali")
-        render_tip("Imposta per ogni collaboratore sia le ore massime che i **giorni di riposo spettanti**.")
+        render_tip("tip_staff")
 
         if not st.session_state.reparti_custom:
             st.warning("⚠️ Registra almeno un Reparto nella scheda 'Struttura Aziendale' prima di aggiungere personale.")
@@ -766,7 +787,7 @@ def render_area_gestore():
     # --- TAB 3: FABBISOGNO OPERATIVO ---
     with t3:
         st.subheader("📈 Fabbisogno del Personale per Reparto")
-        render_tip("Imposta quante persone servono per ogni specifico turno nei giorni della settimana.")
+        render_tip("tip_fabbisogno")
         
         if not st.session_state.reparti_custom:
             st.warning("⚠️ Registra i reparti nella prima scheda per poter compilare la griglia dei fabbisogni.")
@@ -795,7 +816,7 @@ def render_area_gestore():
     # --- TAB 4: CALENDARIO & ASSENZE ---
     with t4:
         st.subheader("📅 Registro Assenze & Disponibilità")
-        render_tip("Registra ferie o permessi. L'algoritmo li escluderà dal calcolo turni.")
+        render_tip("tip_assenze")
 
         oggi = datetime.now()
         cal = calendar.monthcalendar(oggi.year, oggi.month)
@@ -847,7 +868,7 @@ def render_area_gestore():
     # --- TAB 5: GENERATORE IA ---
     with t5:
         st.subheader("⚡ Algoritmo Generatore Turni Intelligente")
-        render_tip("L'algoritmo calcola i turni incrociando: **Fabbisogno Reparto, Ore Max, Giorni di Riposo Spettanti, Assenze e Giorni di Chiusura**.")
+        render_tip("tip_generatore")
 
         data_riferimento = st.date_input("Seleziona data di inizio settimana:", datetime.now() + timedelta(days=7))
         lunedi_scelto = data_riferimento - timedelta(days=data_riferimento.weekday())
